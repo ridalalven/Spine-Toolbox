@@ -1,5 +1,5 @@
 ######################################################################################################################
-# Copyright (C) 2017 - 2019 Spine project consortium
+# Copyright (C) 2017-2020 Spine project consortium
 # This file is part of Spine Toolbox.
 # Spine Toolbox is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General
 # Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
@@ -20,29 +20,43 @@ from PySide2.QtWidgets import QWidget
 from PySide2.QtCore import Qt, QPoint
 from PySide2.QtGui import QTextCursor
 import spinedb_api
-import ui.about
+import spine_engine
+from spinetoolbox import __version__, __version_info__
 
 
 class AboutWidget(QWidget):
-    """About widget class.
+    """About widget class."""
 
-    Attributes:
-        toolbox (ToolboxUI): QMainWindow instance
-        version (str): Application version number
-    """
+    def __init__(self, toolbox):
+        """
 
-    def __init__(self, toolbox, version):
-        """Initializes About widget."""
+        Args:
+            toolbox (ToolboxUI): QMainWindow instance
+        """
+        from ..ui import about
+
         super().__init__(parent=toolbox, f=Qt.Popup)  # Setting the parent inherits the stylesheet
         self._toolbox = toolbox
         # Set up the user interface from Designer file.
-        self.ui = ui.about.Ui_Form()
+        self.ui = about.Ui_Form()
         self.ui.setupUi(self)
         self.setWindowFlags(Qt.Popup)
         # Ensure this window gets garbage-collected when closed
         self.setAttribute(Qt.WA_DeleteOnClose)
-        self.ui.label_version_str.setText("v{0}".format(version))
-        self.ui.label_api_version_str.setText("v{0}".format(spinedb_api.__version__))
+        full_version = (
+            str(__version_info__.major)
+            + "."
+            + str(__version_info__.minor)
+            + "."
+            + str(__version_info__.micro)
+            + "."
+            + __version_info__.releaselevel
+            + "."
+            + str(__version_info__.serial)
+        )
+        self.ui.label_spine_toolbox.setText("Spine Toolbox<br/>v{0}<br/>{1}".format(__version__, full_version))
+        self.ui.label_spinedb_api.setText("spinedb_api<br/>v{0}".format(spinedb_api.__version__))
+        self.ui.label_spine_engine.setText("spine_engine<br/>v{0}".format(spine_engine.__version__))
         self.setup_license_text()
         self._mousePressPos = None
         self._mouseReleasePos = None

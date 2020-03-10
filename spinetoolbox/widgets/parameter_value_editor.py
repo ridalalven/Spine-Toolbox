@@ -1,5 +1,5 @@
 ######################################################################################################################
-# Copyright (C) 2017-2019 Spine project consortium
+# Copyright (C) 2017-2020 Spine project consortium
 # This file is part of Spine Toolbox.
 # Spine Toolbox is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General
 # Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
@@ -16,7 +16,7 @@ An editor dialog for editing database (relationship) parameter values.
 :date:   28.6.2019
 """
 
-from enum import Enum
+from enum import IntEnum, unique
 from PySide2.QtCore import Qt, Slot
 from PySide2.QtWidgets import QDialog, QMessageBox
 from spinedb_api import (
@@ -24,30 +24,33 @@ from spinedb_api import (
     Duration,
     duration_to_relativedelta,
     from_database,
+    Map,
     ParameterValueFormatError,
     TimePattern,
     TimeSeriesFixedResolution,
     TimeSeriesVariableResolution,
     to_database,
 )
-from ui.parameter_value_editor import Ui_ParameterValueEditor
-from widgets.duration_editor import DurationEditor
-from widgets.datetime_editor import DatetimeEditor
-from widgets.plain_parameter_value_editor import PlainParameterValueEditor
-from widgets.time_pattern_editor import TimePatternEditor
-from widgets.time_series_fixed_resolution_editor import TimeSeriesFixedResolutionEditor
-from widgets.time_series_variable_resolution_editor import TimeSeriesVariableResolutionEditor
+from ..widgets.duration_editor import DurationEditor
+from ..widgets.datetime_editor import DatetimeEditor
+from ..widgets.map_editor import MapEditor
+from ..widgets.plain_parameter_value_editor import PlainParameterValueEditor
+from ..widgets.time_pattern_editor import TimePatternEditor
+from ..widgets.time_series_fixed_resolution_editor import TimeSeriesFixedResolutionEditor
+from ..widgets.time_series_variable_resolution_editor import TimeSeriesVariableResolutionEditor
 
 
-class _Editor(Enum):
+@unique
+class _Editor(IntEnum):
     """Indexes for the specialized editors corresponding to the selector combo box and editor stack."""
 
     PLAIN_VALUE = 0
-    TIME_SERIES_FIXED_RESOLUTION = 1
-    TIME_SERIES_VARIABLE_RESOLUTION = 2
-    TIME_PATTERN = 3
-    DATETIME = 4
-    DURATION = 5
+    MAP = 1
+    TIME_SERIES_FIXED_RESOLUTION = 2
+    TIME_SERIES_VARIABLE_RESOLUTION = 3
+    TIME_PATTERN = 4
+    DATETIME = 5
+    DURATION = 6
 
 
 class ParameterValueEditor(QDialog):
@@ -59,31 +62,36 @@ class ParameterValueEditor(QDialog):
     by changing the specialized editor using a combo box.
     When the dialog is closed the value from the currently shown specialized editor is
     written back to the parent model.
-
-    Attributes:
-        parent_index (QModelIndex): an index to a parameter value in parent_model
-        value_name (str): name of the value
-        value: parameter value or None if it should be loaded from parent_index
-        parent_widget (QWidget): a parent widget
     """
 
     def __init__(self, parent_index, value_name="", value=None, parent_widget=None):
+        """
+        Args:
+            parent_index (QModelIndex): an index to a parameter value in parent_model
+            value_name (str): name of the value
+            value: parameter value or None if it should be loaded from parent_index
+            parent_widget (QWidget): a parent widget
+        """
+        from ..ui.parameter_value_editor import Ui_ParameterValueEditor
+
         super().__init__(parent_widget)
         self._parent_model = parent_index.model()
         self._parent_index = parent_index
         self._ui = Ui_ParameterValueEditor()
         self._ui.setupUi(self)
-        self.setWindowTitle(value_name + " - Edit value")
+        self.setWindowTitle(f"Edit value    -- {value_name} --")
         self.setWindowFlag(Qt.WindowMinMaxButtonsHint)
-        self._ui.ok_button.clicked.connect(self.accept)
-        self._ui.cancel_button.clicked.connect(self.reject)
+        self._ui.button_box.accepted.connect(self.accept)
+        self._ui.button_box.rejected.connect(self.reject)
         self._time_pattern_editor = TimePatternEditor()
         self._plain_value_editor = PlainParameterValueEditor()
+        self._map_editor = MapEditor()
         self._time_series_fixed_resolution_editor = TimeSeriesFixedResolutionEditor()
         self._time_series_variable_resolution_editor = TimeSeriesVariableResolutionEditor()
         self._datetime_editor = DatetimeEditor()
         self._duration_editor = DurationEditor()
         self._ui.editor_stack.addWidget(self._plain_value_editor)
+        self._ui.editor_stack.addWidget(self._map_editor)
         self._ui.editor_stack.addWidget(self._time_series_fixed_resolution_editor)
         self._ui.editor_stack.addWidget(self._time_series_variable_resolution_editor)
         self._ui.editor_stack.addWidget(self._time_pattern_editor)
@@ -94,25 +102,23 @@ class ParameterValueEditor(QDialog):
             try:
                 value = from_database(self._parent_model.data(parent_index, Qt.EditRole))
             except ParameterValueFormatError as error:
-                self._warn_and_select_default_view("Failed to load value: {}".format(error))
+                self._select_default_view(message="Failed to load value: {}".format(error))
                 return
         self._select_editor(value)
 
-    @Slot(name="accept")
+    @Slot()
     def accept(self):
         """Saves the parameter value shown in the currently selected editor widget back to the parent model."""
         editor = self._ui.editor_stack.currentWidget()
         try:
             self._parent_model.setData(self._parent_index, to_database(editor.value()))
         except ParameterValueFormatError as error:
-            message_box = QMessageBox()
-            message_box.setWindowTitle("Parameter value error")
-            message_box.setText("Cannot set value: {}".format(error))
-            message_box.exec()
+            message = "Cannot set value: {}".format(error)
+            QMessageBox.warning(self, "Parameter Value error", message)
             return
         self.close()
 
-    @Slot(int, name="_change_parameter_type")
+    @Slot(int)
     def _change_parameter_type(self, selector_index):
         """
         Handles switching between value types.
@@ -125,8 +131,8 @@ class ParameterValueEditor(QDialog):
         """
         old_index = self._ui.editor_stack.currentIndex()
         if (
-            selector_index == _Editor.TIME_SERIES_VARIABLE_RESOLUTION.value
-            and old_index == _Editor.TIME_SERIES_FIXED_RESOLUTION.value
+            selector_index == _Editor.TIME_SERIES_VARIABLE_RESOLUTION
+            and old_index == _Editor.TIME_SERIES_FIXED_RESOLUTION
         ):
             fixed_resolution_value = self._time_series_fixed_resolution_editor.value()
             stamps = fixed_resolution_value.indexes
@@ -157,37 +163,43 @@ class ParameterValueEditor(QDialog):
     def _select_editor(self, value):
         """Shows the editor widget corresponding to the given value type on the editor stack."""
         if isinstance(value, (int, float, bool)):
-            self._ui.parameter_type_selector.setCurrentIndex(_Editor.PLAIN_VALUE.value)
-            self._ui.editor_stack.setCurrentIndex(_Editor.PLAIN_VALUE.value)
+            self._ui.parameter_type_selector.setCurrentIndex(_Editor.PLAIN_VALUE)
+            self._ui.editor_stack.setCurrentIndex(_Editor.PLAIN_VALUE)
             self._plain_value_editor.set_value(value)
+        elif isinstance(value, Map):
+            self._ui.parameter_type_selector.setCurrentIndex(_Editor.MAP)
+            self._ui.editor_stack.setCurrentIndex(_Editor.MAP)
+            self._map_editor.set_value(value)
         elif isinstance(value, TimeSeriesFixedResolution):
-            self._ui.parameter_type_selector.setCurrentIndex(_Editor.TIME_SERIES_FIXED_RESOLUTION.value)
-            self._ui.editor_stack.setCurrentIndex(_Editor.TIME_SERIES_FIXED_RESOLUTION.value)
+            self._ui.parameter_type_selector.setCurrentIndex(_Editor.TIME_SERIES_FIXED_RESOLUTION)
+            self._ui.editor_stack.setCurrentIndex(_Editor.TIME_SERIES_FIXED_RESOLUTION)
             self._time_series_fixed_resolution_editor.set_value(value)
         elif isinstance(value, TimeSeriesVariableResolution):
-            self._ui.parameter_type_selector.setCurrentIndex(_Editor.TIME_SERIES_VARIABLE_RESOLUTION.value)
-            self._ui.editor_stack.setCurrentIndex(_Editor.TIME_SERIES_VARIABLE_RESOLUTION.value)
+            self._ui.parameter_type_selector.setCurrentIndex(_Editor.TIME_SERIES_VARIABLE_RESOLUTION)
+            self._ui.editor_stack.setCurrentIndex(_Editor.TIME_SERIES_VARIABLE_RESOLUTION)
             self._time_series_variable_resolution_editor.set_value(value)
         elif isinstance(value, TimePattern):
-            self._ui.parameter_type_selector.setCurrentIndex(_Editor.TIME_PATTERN.value)
-            self._ui.editor_stack.setCurrentIndex(_Editor.TIME_PATTERN.value)
+            self._ui.parameter_type_selector.setCurrentIndex(_Editor.TIME_PATTERN)
+            self._ui.editor_stack.setCurrentIndex(_Editor.TIME_PATTERN)
             self._time_pattern_editor.set_value(value)
         elif isinstance(value, DateTime):
-            self._ui.parameter_type_selector.setCurrentIndex(_Editor.DATETIME.value)
-            self._ui.editor_stack.setCurrentIndex(_Editor.DATETIME.value)
+            self._ui.parameter_type_selector.setCurrentIndex(_Editor.DATETIME)
+            self._ui.editor_stack.setCurrentIndex(_Editor.DATETIME)
             self._datetime_editor.set_value(value)
         elif isinstance(value, Duration):
-            self._ui.parameter_type_selector.setCurrentIndex(_Editor.DURATION.value)
-            self._ui.editor_stack.setCurrentIndex(_Editor.DURATION.value)
+            self._ui.parameter_type_selector.setCurrentIndex(_Editor.DURATION)
+            self._ui.editor_stack.setCurrentIndex(_Editor.DURATION)
             self._duration_editor.set_value(value)
         else:
-            self._warn_and_select_default_view("Unknown parameter type. Opening an empty editor.")
+            self._select_default_view()
 
-    def _warn_and_select_default_view(self, message):
-        """Displays a warning dialog and opens the default editor widget after user clicks OK."""
-        message_box = QMessageBox()
-        message_box.setWindowTitle("Warning")
-        message_box.setText(message)
-        message_box.exec()
-        self._ui.parameter_type_selector.setCurrentIndex(_Editor.PLAIN_VALUE.value)
-        self._ui.editor_stack.setCurrentIndex(_Editor.PLAIN_VALUE.value)
+    def _select_default_view(self, message=None):
+        """Opens the default editor widget. Optionally, displays a warning dialog indicating the problem.
+
+        Args:
+            message (str, optional)
+        """
+        if message is not None:
+            QMessageBox.warning(self.parent(), "Warning", message)
+        self._ui.parameter_type_selector.setCurrentIndex(_Editor.PLAIN_VALUE)
+        self._ui.editor_stack.setCurrentIndex(_Editor.PLAIN_VALUE)

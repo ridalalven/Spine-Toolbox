@@ -16,21 +16,22 @@
 import os
 import sys
 
-app_path = os.path.join(os.path.dirname(__file__), os.path.pardir, os.path.pardir, "spinetoolbox")
+app_path = os.path.join(os.path.dirname(__file__), os.path.pardir, os.path.pardir)
 sys.path.insert(0, os.path.abspath(app_path))
-from config import SPINE_TOOLBOX_VERSION
+
+from spinetoolbox.version import __version__, __version_info__
 
 # -- Project information -----------------------------------------------------
 
 project = 'Spine Toolbox'
 author = 'P. Savolainen, M. Marin, E. Rinne, P. Vennström, A. Soininen'
-copyright = '2019, {}'.format(author)
+copyright = '2020, {}'.format(author)
 
 
 # The short X.Y version
-version = SPINE_TOOLBOX_VERSION.rpartition('.')[0]
+version = str(__version_info__.major) + "." + str(__version_info__.minor)
 # The full version, including alpha/beta/rc tags
-release = SPINE_TOOLBOX_VERSION
+release = __version__ + "-" + __version_info__.releaselevel + "." + str(__version_info__.serial)
 
 
 # -- General configuration ---------------------------------------------------
@@ -43,7 +44,6 @@ release = SPINE_TOOLBOX_VERSION
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autodoc',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
     'sphinx.ext.ifconfig',
@@ -52,7 +52,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
     'recommonmark',
-    'autoapi.extension',
+    'autoapi.extension'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -80,13 +80,19 @@ exclude_patterns = []
 pygments_style = 'sphinx'
 
 # Settings for Sphinx AutoAPI
+autoapi_python_class_content = "both"
+autoapi_add_toctree_entry = True
+autoapi_root = "autoapi"
 autoapi_dirs = ['../../spinetoolbox']  # package to be documented
 autoapi_ignore = [
     '*_rc.py',
-    '*/spinetoolbox/test/*',
+    '*/spinetoolbox/build/*',
+    '*/spinetoolbox/dist/*',
     '*/spinetoolbox/ui/*',
     '*/spinetoolbox/setup.py',
+    '*/spinetoolbox/project_items/*/ui/*',
 ]  # ignored modules
+
 
 # -- Options for HTML output -------------------------------------------------
 

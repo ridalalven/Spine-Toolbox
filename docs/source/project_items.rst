@@ -3,11 +3,15 @@
 
 .. |data_connection| image:: ../../spinetoolbox/ui/resources/project_item_icons/file-alt.svg
    :width: 16
-.. |data_interface| image:: ../../spinetoolbox/ui/resources/project_item_icons/map-solid.svg
+.. |importer| image:: ../../spinetoolbox/ui/resources/project_item_icons/database-import.svg
    :width: 16
 .. |data_store| image:: ../../spinetoolbox/ui/resources/project_item_icons/database.svg
    :width: 16
 .. |execute| image:: ../../spinetoolbox/ui/resources/project_item_icons/play-circle-solid.svg
+   :width: 16
+.. |execute-selected| image:: ../../spinetoolbox/ui/resources/project_item_icons/play-circle-regular.svg
+   :width: 16
+.. |exporter| image:: ../../spinetoolbox/ui/resources/project_item_icons/database-export.svg
    :width: 16
 .. |tool| image:: ../../spinetoolbox/ui/resources/project_item_icons/hammer.svg
    :width: 16
@@ -20,10 +24,10 @@
 Project Items
 *************
 
-Project items in the *Design view* make up the graph (directed acyclic graph, DAG)
-that is executed when the |execute| button is pressed.
+Project items in the *Design view* and the connections between them make up the graph (Directed Acyclic Graph, DAG)
+that is executed when the |execute| or |execute-selected| buttons are pressed.
 
-See :ref:`Executing Tools` for more information on how the DAG is processed by Toolbox.
+See :ref:`Executing Tools` for more information on how the DAG is processed by Spine Toolbox.
 
 The following items are currently available:
 
@@ -44,21 +48,28 @@ It also provides access to the :ref:`Datapackage editor <Spine datapackage edito
 Tool |tool|
 -----------
 
-Tool is the heart of a DAG. It is usually the actual model to be executed in the toolbox
+Tool is the heart of a DAG. It is usually the actual model to be executed in Spine Toolbox
 but can be an arbitrary script or executable as well.
-A tool is specified by its :ref:`template <Tool template editor>`.
+A tool is specified by its :ref:`specification <Tool specification editor>`.
 
 View |view|
 -----------
 
-A View item is meant for inspecting data from multiple sources using the :ref:`data store views <Data store views>`.
+A View item is meant for inspecting data from multiple sources using the
+:ref:`data store views <Data store views>`.
 Note that the data is opened in read-only mode so modifications are not possible from the View item.
 
 .. note::
 
    Currently, only *Tree view* supports multiple databases.
 
-Data Interface |data_interface|
--------------------------------
+Importer |importer|
+-------------------
 
-This item provides mapping from tabulated data (comma separated values, Excel) to the Spine data model.
+This item provides mapping from tabulated data such as comma separated values or Excel to the Spine data model.
+
+Exporter |exporter|
+-------------------
+
+This item exports databases contained in a *Data Store* into :literal:`.gdx` format for GAMS Tools.
+See :ref:`Importing and exporting data` for more information.

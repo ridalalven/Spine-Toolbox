@@ -1,5 +1,5 @@
 ######################################################################################################################
-# Copyright (C) 2017 - 2019 Spine project consortium
+# Copyright (C) 2017-2020 Spine project consortium
 # This file is part of Spine Toolbox.
 # Spine Toolbox is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General
 # Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
@@ -19,9 +19,6 @@ Functions to report failures in plotting to the user.
 from PySide2.QtWidgets import QMessageBox
 
 
-def report_plotting_failure(error):
+def report_plotting_failure(error, parent_widget):
     """Reports a PlottingError exception to the user."""
-    errorBox = QMessageBox()
-    errorBox.setWindowTitle("Plotting failed")
-    errorBox.setText(error.message)
-    errorBox.exec()
+    QMessageBox.warning(parent_widget, "Plotting Failed", error.message)

@@ -1,5 +1,6 @@
+# -*- coding: utf-8 -*-
 ######################################################################################################################
-# Copyright (C) 2017 - 2019 Spine project consortium
+# Copyright (C) 2017-2020 Spine project consortium
 # This file is part of Spine Toolbox.
 # Spine Toolbox is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General
 # Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
@@ -9,11 +10,11 @@
 # this program. If not, see <http://www.gnu.org/licenses/>.
 ######################################################################################################################
 
-# -*- coding: utf-8 -*-
-
-# Form implementation generated from reading ui file '../spinetoolbox/ui/about.ui',
-# licensing of '../spinetoolbox/ui/about.ui' applies.
+# Form implementation generated from reading ui file 'C:\data\GIT\SPINETOOLBOX\bin\..\spinetoolbox\ui\about.ui',
+# licensing of 'C:\data\GIT\SPINETOOLBOX\bin\..\spinetoolbox\ui\about.ui' applies.
 #
+# Created: Thu Feb 13 11:59:35 2020
+#      by: pyside2-uic  running on PySide2 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -122,11 +123,8 @@ class Ui_Form(object):
         self.widget_9.setAutoFillBackground(True)
         self.widget_9.setObjectName("widget_9")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.widget_9)
-        self.verticalLayout.setSpacing(0)
         self.verticalLayout.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout.setObjectName("verticalLayout")
-        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout.addItem(spacerItem)
         self.label_spine_toolbox = QtWidgets.QLabel(self.widget_9)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(0)
@@ -138,7 +136,7 @@ class Ui_Form(object):
         self.label_spine_toolbox.setBaseSize(QtCore.QSize(0, 0))
         font = QtGui.QFont()
         font.setFamily("Arial Black")
-        font.setPointSize(8)
+        font.setPointSize(6)
         font.setWeight(50)
         font.setBold(False)
         self.label_spine_toolbox.setFont(font)
@@ -147,49 +145,38 @@ class Ui_Form(object):
         self.label_spine_toolbox.setAlignment(QtCore.Qt.AlignCenter)
         self.label_spine_toolbox.setObjectName("label_spine_toolbox")
         self.verticalLayout.addWidget(self.label_spine_toolbox)
-        self.label_version_str = QtWidgets.QLabel(self.widget_9)
+        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.verticalLayout.addItem(spacerItem)
+        self.label_spinedb_api = QtWidgets.QLabel(self.widget_9)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.label_version_str.sizePolicy().hasHeightForWidth())
-        self.label_version_str.setSizePolicy(sizePolicy)
-        self.label_version_str.setMinimumSize(QtCore.QSize(0, 0))
-        self.label_version_str.setBaseSize(QtCore.QSize(0, 0))
+        sizePolicy.setHeightForWidth(self.label_spinedb_api.sizePolicy().hasHeightForWidth())
+        self.label_spinedb_api.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
         font.setFamily("Arial Black")
-        font.setWeight(50)
-        font.setBold(False)
-        self.label_version_str.setFont(font)
-        self.label_version_str.setStyleSheet("color: rgb(255, 255, 255);")
-        self.label_version_str.setTextFormat(QtCore.Qt.RichText)
-        self.label_version_str.setScaledContents(True)
-        self.label_version_str.setAlignment(QtCore.Qt.AlignCenter)
-        self.label_version_str.setMargin(0)
-        self.label_version_str.setIndent(75)
-        self.label_version_str.setObjectName("label_version_str")
-        self.verticalLayout.addWidget(self.label_version_str)
-        spacerItem1 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout.addItem(spacerItem1)
-        self.label_spinedb_api = QtWidgets.QLabel(self.widget_9)
-        font = QtGui.QFont()
-        font.setFamily("Arial Black")
-        font.setPointSize(8)
+        font.setPointSize(6)
         self.label_spinedb_api.setFont(font)
         self.label_spinedb_api.setStyleSheet("color: rgb(255, 255, 255);")
         self.label_spinedb_api.setAlignment(QtCore.Qt.AlignCenter)
         self.label_spinedb_api.setObjectName("label_spinedb_api")
         self.verticalLayout.addWidget(self.label_spinedb_api)
-        self.label_api_version_str = QtWidgets.QLabel(self.widget_9)
+        spacerItem1 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.verticalLayout.addItem(spacerItem1)
+        self.label_spine_engine = QtWidgets.QLabel(self.widget_9)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.label_spine_engine.sizePolicy().hasHeightForWidth())
+        self.label_spine_engine.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
         font.setFamily("Arial Black")
-        font.setPointSize(8)
-        font.setWeight(50)
-        font.setBold(False)
-        self.label_api_version_str.setFont(font)
-        self.label_api_version_str.setStyleSheet("color: rgb(255, 255, 255);")
-        self.label_api_version_str.setAlignment(QtCore.Qt.AlignCenter)
-        self.label_api_version_str.setObjectName("label_api_version_str")
-        self.verticalLayout.addWidget(self.label_api_version_str)
+        font.setPointSize(6)
+        self.label_spine_engine.setFont(font)
+        self.label_spine_engine.setStyleSheet("color: rgb(255, 255, 255);")
+        self.label_spine_engine.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_spine_engine.setObjectName("label_spine_engine")
+        self.verticalLayout.addWidget(self.label_spine_engine)
         spacerItem2 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.verticalLayout.addItem(spacerItem2)
         self.horizontalLayout.addWidget(self.widget_9)
@@ -526,9 +513,8 @@ class Ui_Form(object):
     def retranslateUi(self, Form):
         Form.setWindowTitle(QtWidgets.QApplication.translate("Form", "About Spine Toolbox", None, -1))
         self.label_spine_toolbox.setText(QtWidgets.QApplication.translate("Form", "<html><head/><body><p>Spine Toolbox</p></body></html>", None, -1))
-        self.label_version_str.setText(QtWidgets.QApplication.translate("Form", "<html><head/><body><p>Version</p></body></html>", None, -1))
         self.label_spinedb_api.setText(QtWidgets.QApplication.translate("Form", "<html><head/><body><p>spinedb_api</p></body></html>", None, -1))
-        self.label_api_version_str.setText(QtWidgets.QApplication.translate("Form", "<html><head/><body><p>Version</p></body></html>", None, -1))
+        self.label_spine_engine.setText(QtWidgets.QApplication.translate("Form", "<html><head/><body><p>spine_engine</p></body></html>", None, -1))
         self.textBrowser.setHtml(QtWidgets.QApplication.translate("Form", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
 "p, li { white-space: pre-wrap; }\n"
@@ -536,5 +522,5 @@ class Ui_Form(object):
 "<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-size:8.25pt;\"><br /></p></body></html>", None, -1))
         self.label_3.setText(QtWidgets.QApplication.translate("Form", "<html><head/><body><p><a href=\"http://www.spine-model.org\"><span style=\" color:#ffffff; text-decoration: none\">www.spine-model.org</span></a></p></body></html>", None, -1))
 
-import resources_icons_rc
-import resources_logos_rc
+from spinetoolbox import resources_icons_rc
+from spinetoolbox import resources_logos_rc

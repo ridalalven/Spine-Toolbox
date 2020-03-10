@@ -1,5 +1,5 @@
 ######################################################################################################################
-# Copyright (C) 2017 - 2019 Spine project consortium
+# Copyright (C) 2017-2020 Spine project consortium
 # This file is part of Spine Toolbox.
 # Spine Toolbox is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General
 # Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
@@ -16,28 +16,31 @@ Custom QGraphicsScene used in the Design View.
 :date:   13.2.2019
 """
 
-from PySide2.QtWidgets import QGraphicsScene
-from PySide2.QtCore import Signal, Slot, QItemSelectionModel
+from PySide2.QtCore import Slot, QItemSelectionModel
 from PySide2.QtGui import QColor, QPen, QBrush
-from graphics_items import DataConnectionIcon, ToolIcon, DataStoreIcon, ViewIcon, DataInterfaceIcon, ProjectItemIcon
-from widgets.toolbars import DraggableWidget
+from ..graphics_items import ProjectItemIcon
+from .shrinking_scene import ShrinkingScene
+from .toolbars import DraggableWidget
 
 
-class CustomQGraphicsScene(QGraphicsScene):
+class CustomQGraphicsScene(ShrinkingScene):
     """A scene that handles drag and drop events of DraggableWidget sources."""
 
-    files_dropped_on_dc = Signal("QGraphicsItem", "QVariant", name="files_dropped_on_dc")
-
     def __init__(self, parent, toolbox):
-        """Initialize class."""
-        super().__init__(parent)
+        """
+        Args:
+            parent (QObject): scene's parent object
+            toolbox (ToolboxUI): reference to the main window
+        """
+        super().__init__(400.0, 300.0, parent)
         self._toolbox = toolbox
         self.item_shadow = None
         self.sync_selection = True
         # Set background attributes
-        grid = self._toolbox.qsettings().value("appSettings/bgGrid", defaultValue="false")
+        settings = toolbox.qsettings()
+        grid = settings.value("appSettings/bgGrid", defaultValue="false")
         self.bg_grid = grid != "false"
-        bg_color = self._toolbox.qsettings().value("appSettings/bgColor", defaultValue="false")
+        bg_color = settings.value("appSettings/bgColor", defaultValue="false")
         self.bg_color = QColor("#f5f5f5") if bg_color == "false" else bg_color
         self.connect_signals()
 
@@ -64,18 +67,19 @@ class CustomQGraphicsScene(QGraphicsScene):
 
     @Slot(name="handle_selection_changed")
     def handle_selection_changed(self):
-        """Synchronize selection with the project tree.
-        """
+        """Synchronize selection with the project tree."""
         if not self.sync_selection:
             return
         selected_items = [item for item in self.selectedItems() if isinstance(item, ProjectItemIcon)]
-        self._toolbox.ui.treeView_project.clearSelection()
         selected_inds = [self._toolbox.project_item_model.find_item(item.name()) for item in selected_items]
+        self._toolbox.ui.treeView_project.clearSelection()
         for ind in selected_inds:
             self._toolbox.ui.treeView_project.selectionModel().select(ind, QItemSelectionModel.Select)
         # Make last item selected the current index in project tree view
         if bool(selected_inds):
-            self._toolbox.ui.treeView_project.setCurrentIndex(selected_inds[-1])
+            self._toolbox.ui.treeView_project.selectionModel().setCurrentIndex(
+                selected_inds[-1], QItemSelectionModel.NoUpdate
+            )
 
     def set_bg_color(self, color):
         """Change background color when this is changed in Settings.
@@ -127,27 +131,15 @@ class CustomQGraphicsScene(QGraphicsScene):
             event.ignore()
             return
         event.acceptProposedAction()
-        text = event.mimeData().text()
+        category = event.mimeData().text()
         pos = event.scenePos()
         w = 70
         h = 70
         x = pos.x() - w / 2
         y = pos.y() - h / 2
-        if text == "Data Store":
-            self.item_shadow = DataStoreIcon(self._toolbox, x, y, w, h, "...")
-            self._toolbox.show_add_data_store_form(pos.x(), pos.y())
-        elif text == "Data Connection":
-            self.item_shadow = DataConnectionIcon(self._toolbox, x, y, w, h, "...")
-            self._toolbox.show_add_data_connection_form(pos.x(), pos.y())
-        elif text == "Tool":
-            self.item_shadow = ToolIcon(self._toolbox, x, y, w, h, "...")
-            self._toolbox.show_add_tool_form(pos.x(), pos.y())
-        elif text == "View":
-            self.item_shadow = ViewIcon(self._toolbox, x, y, w, h, "...")
-            self._toolbox.show_add_view_form(pos.x(), pos.y())
-        elif text == "Data Interface":
-            self.item_shadow = DataInterfaceIcon(self._toolbox, x, y, w, h, "...")
-            self._toolbox.show_add_data_interface_form(pos.x(), pos.y())
+        icon_maker = self._toolbox.categories[category]["icon_maker"]
+        self.item_shadow = icon_maker(self._toolbox, x, y, w, h, None)
+        self._toolbox.show_add_project_item_form(category, pos.x(), pos.y())
 
     def drawBackground(self, painter, rect):
         """Reimplemented method to make a custom background.
@@ -156,13 +148,12 @@ class CustomQGraphicsScene(QGraphicsScene):
             painter (QPainter): Painter that is used to paint background
             rect (QRectF): The exposed (viewport) rectangle in scene coordinates
         """
-        rect = self.sceneRect()  # Override to only draw background for the scene rectangle
+        scene_rect = self.sceneRect()
+        rect = rect.intersected(scene_rect)  # Limit to only draw background for the scene rectangle
         if not self.bg_grid:
             painter.fillRect(rect, QBrush(self.bg_color))
             return
         step = 20  # Grid step
-        # logging.debug("sceneRect pos:({0:.1f}, {1:.1f}) size:({2:.1f}, {3:.1f})"
-        #               .format(rect.x(), rect.y(), rect.width(), rect.height()))
         painter.setPen(QPen(QColor(0, 0, 0, 40)))
         # Draw horizontal grid
         start = round(rect.top(), step)

@@ -1,5 +1,5 @@
 ######################################################################################################################
-# Copyright (C) 2017 - 2019 Spine project consortium
+# Copyright (C) 2017-2020 Spine project consortium
 # This file is part of Spine Toolbox.
 # Spine Toolbox is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General
 # Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
@@ -20,7 +20,7 @@ Contains SqlAlchemyConnector class and a help function.
 from sqlalchemy import create_engine, MetaData
 from sqlalchemy.orm import Session
 from PySide2.QtWidgets import QInputDialog
-from spine_io.io_api import SourceConnection
+from ..io_api import SourceConnection
 
 
 def select_sa_conn_string(parent=None):
@@ -75,8 +75,8 @@ class SqlAlchemyConnector(SourceConnection):
     def get_tables(self):
         """Method that should return a list of table names, list(str)
 
-        Raises:
-            NotImplementedError: [description]
+        Returns:
+            list(str): Table names in list
         """
         tables = list(self._engine.table_names())
         return tables

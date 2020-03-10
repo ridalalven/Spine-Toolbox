@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Spine Toolbox"
-#define MyAppVersion "0.3b"
+#define MyAppVersion "0.4.0.beta.0"
 #define MyAppPublisher "Spine Project Consortium"
 #define MyAppURL "https://github.com/Spine-project"
 #define MyAppExeName "spinetoolbox.exe"
@@ -28,7 +28,7 @@ OutputBaseFilename=spine-toolbox-{#MyAppVersion}-x64
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequired=admin
-OutputDir=spinetoolbox\dist
+OutputDir=dist
 ArchitecturesInstallIn64BitMode=x64 ia64
 ArchitecturesAllowed=x64 ia64 arm64
 UsePreviousAppDir=yes
@@ -53,8 +53,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "spinetoolbox\build\exe.win-amd64-3.6\spinetoolbox.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "spinetoolbox\build\exe.win-amd64-3.6\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "build\exe.win-amd64-3.6\spinetoolbox.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "build\exe.win-amd64-3.6\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Dirs]
@@ -65,6 +65,10 @@ Name: "{app}\work"; Permissions: users-full
 Name: "{group}\{#MyAppName} {#MyAppVersion}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{commondesktop}\{#MyAppName} {#MyAppVersion}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\lib\numpy"
+Type: filesandordirs; Name: "{app}\lib\spinedb_api\alembic"
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

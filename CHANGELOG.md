@@ -3,10 +3,85 @@ All **notable** changes to this project are documented here.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 
-## [0.3b] - 2019-08-26
+## [Unreleased]
 
 ### Added
-- Zooming (by using the mouse wheel) is now enabled in Design View. You can also select multiple project
+- Undo/Redo in Design View
+- It is now possible to add new plots to existing plot windows in Data Store View.
+
+### Changed
+- The graph view behavior has changed. Now selecting objects in the object tree not only shows those objects but also 
+  all the cascading relationships. This is to facilitate exploring the system without a previous knowledge.
+
+### Deprecated
+### Removed
+### Fixed
+### Security
+
+## [0.4.0.beta.0] - 2020-02-17
+
+### Added
+- A small notification icon is painted next to project items in the design view whenever they are missing some
+  configuration. Hovering the icon shows tips for completing the configuration.
+- A small icon is painted next to the project items in the design view to show the order in which they will be
+  executed
+- Main Window menu 'File -> Open recent'. Shortcut for opening a recent project.
+- A new project item *Exporter* allows a database contained in a *Data Store* to be exported as GAMS `.gdx` file.
+- It is now possible to copy and paste project items for example between projects.
+- It is now possible to duplicate project items.
+- Changes made in the tree view are also seen in the graph view and viceversa.
+- New Setting: *Sticky selection in Graph View*. Enables users to select if they want to use multi-selection or 
+  single selection in the Graph view Object tree when selecting items with the **left-mouse button**.
+- Projects can be saved to any directory
+- Project name can be changed in Settings
+- The graph view features a short live demonstration that new users can follow to discover the basic functionality.
+- New Setting: *Curved links*. When active, links on the Design View follow a smooth curve rather than a straight line.
+- When execution traverses a link, a small animation is played to denote the flow of data. Users can set how quick
+  they want this animation to be in Settings. The fastest setting effectively disables the animation.
+- Special 'tag' command line arguments are now available in Tool Specification which expand to, for example,
+  input database URLS or paths to optional input files when a Tool is executed.
+- It is now possible to undo/redo database changes in the Data Store form.
+- It is now possible to visualize the history of database changes in the Data Store form. The option is 
+  available in the Session menu.
+- Support for Tool command line arguments. You can now give Tool (project item) command 
+  line arguments in addition to Tool Specification command line arguments.
+
+### Changed
+- spinetoolbox is now a Python package. To start the app, use command `python -m spinetoolbox` or
+  `python spinetoolbox.py` as spinetoolbox.py has been moved to repository root. 
+- Tool templates are now called Tool specifications
+- File->Open Project opens a file dialog, where you can open projects by selecting an old 
+  <project_name>.proj file or a Spine Toolbox Project directory. Valid Spine Toolbox projects are 
+  decorated with the Spine logo.
+- When opening an old style project (.proj file), the project must be upgraded to a new style project 
+  by selecting a new directory for the project.
+- Project information is not saved to a <project_name>.proj file anymore. This information is now located 
+  in file <project_dir>/.spinetoolbox/project.json. Every Spine Toolbox project has this file.
+- Work directory is now a global setting instead of a project setting
+- Renamed *Data Interface* project item to *Importer*.
+  The corresponding category *Data Importers* was renamed to *Importers*.
+- The status bar of the Data store view is gone. Instead, notifications are printed in a box on the right side of
+  the form.
+- Tree, graph, and tabular views have been merged into one consolidated view. You can choose your preferred style
+  from the View menu.
+
+### Deprecated
+- Saving project information to .proj files
+
+### Removed
+
+### Fixed
+- Data advertised by a project item during execution is only accessible by its direct children.
+  In other words, resources are passed to the next items in line but not beyond.
+- Executing the Importer project item has been fixed on Windows release version
+
+### Security
+
+## [0.3] - 2019-09-06
+
+### Added
+- Welcome message including a link to Getting Started guide.
+- Zooming (by using the mouse wheel) is now enabled in Design View. You can also select multiple project.
   items by pressing the Ctrl-key down and dragging the mouse.
 - New project item icons on Design View.
 - Two options for the Design View background (grid or solid). See Settings (F1).
@@ -18,30 +93,41 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 - The Data Store treeview now also has a relationship tree.
 - Support for reordering columns in the treeview.
 - Selecting 'edit object classes' in the treeview now also allows the icon to be selected.
-- There is now an upper limit on how much text is logged in Event Log and Process Log. The oldest lines are removed
-  if the limit is exceeded.
 - Play button to main window Toolbar that executes all Directed Acyclic Graphs in the Project one after another.
 - Another Play button to main window Toolbar to execute selected Directed Acyclic Graph. Selecting a DAG happens by
   selecting one or more project items belonging to the wanted DAG in the Design View or in Project Items list.
 - Stop button to main window Toolbar, which terminates execution.
-- Now it's possible to specify a dedicated Julia project or environment for Spine Toolbox in the settings.
+- Possibility to specify a dedicated Julia project or environment for Spine Toolbox in the settings.
 - Feature to Export project to GraphML format. Each graph in Design View is written to its own file. To do this, just
-  select *Export project to GraphML* from the Project Item list context-menu or from *File -> 
+  select *Export project to GraphML* from the Project Item list context-menu or from *File ->
   Export project to GraphML*.
-- New project item: Data Interface
+- New project item: *Data Interface*
 - Parameter and relationship parameter values can now be edited in a dedicated editor window in Tree, Graph and Tabular
-  views. The editor is accessible from when right clicking a value and selecting `Open in editor...`.
+  views. The editor is accessible by right-clicking a value and selecting `Open in editor...`.
 - It is now possible to plot parameter and relationship parameter values in Tree, Graph and Tabular views.
+
+### Fixed
+- There is now an upper limit on how much text is logged in Event Log and Process Log. The oldest lines are removed
+  if the limit is exceeded. This fixes a problem with excessive memory usage when running long processes.
+- Mouse click problems in Design View
+- Mouse cursor problem in Tool Configuration Assistant
+- Welcome message is now shown for first time users
+- NameError: SpineDBAPIError when executing Data Stores.
+- .py files in *spinedb_api\alembic\versions* are now copied to the installation bundle without compiling them to
+  .pyc files first. Also, if there's a previous version installed, *spinedb_api\alembic* directory is deleted
+  before installation begins [Win-x64].
+- Added missing modules from *spinedb_api\alembic\versions* package into installation bundle [Win-x64].
+- *numpy* is now deleted before installation begins so installing over an existing installation of Spine Toolbox
+  works again [Win-x64].
+- *packaging* and *appdirs* packages are now included in the installation bundle [Win-x64].
 
 ### Changed
 - Selecting the Julia environment in Settings now requires picking the Julia interpreter **file**
   (e.g. julia.exe on Windows) instead of the directory where the Julia interpreter is located.
 - Selecting the GAMS program (**file**) in Settings now requires picking the GAMS program (e.g. gams.exe
   on Windows) instead of the directory where the GAMS program is located.
-- Selected Julia and GAMS are now stored to persistent memory using Qt's QSettings class and not into
-  settings.conf file. This means that these options have been set to factory defaults in Settings.
-- All application Settings are now saved using Qt's QSettings class. *conf/settings.conf* file is not
-  needed anymore.
+- All application Settings are now saved using Qt's QSettings class. Old configuration file,
+  *conf/settings.conf* file has been removed.
 - New Spine databases can be created in any backend supported by spinedb_api. The Data Store item properties
   have been changed to allow for this.
 - Executing Directed Acyclic Graphs instead of just Tools.
@@ -49,9 +135,11 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
   Play button in the main window Toolbar.
 
 ### Removed
+- An unnecessary error dialog in Import Preview widget.
 - ConfigurationParser class in configuration.py.
 - Execute button in Tool Properties.
 - Stop button in Tool Properties.
+- Console window that opened in addition to the application window is not shown anymore [Win-x64].
 
 ## [0.2] - 2019-01-17
 

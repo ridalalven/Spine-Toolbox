@@ -1,11 +1,15 @@
+..  Importing and exporting data
+    Created: 15.5.2019
+
+.. _Importing and exporting data:
+
 ****************************
 Importing and exporting data
 ****************************
 
-This section explains the different ways of importing and exporting data to and from a Spine database.
+.. note:: This section is a work in progress.
 
-.. contents::
-    :local:
+This section explains the different ways of importing and exporting data to and from a Spine database.
 
 Excel
 -----
@@ -46,363 +50,140 @@ When importing, all sheets with a valid format are imported, whereas sheets with
 When exporting all object classes and relationship classes are exported.
 Only parameter values with timeseries data are exported in the timeseries format.
 
+GAMS
+----
 
-Datapackage
------------
+.. note::
+   You need to have GAMS installed to use this functionality.
+   However, you do not need to own a GAMS license as the demo version works just as well.
 
-This section explains how to convert a datapackage into a Spine database. **The other way around,
-i.e., converting a Spine database into a datapackage is not yet supported.**
+.. note::
+   The bitness (32 or 64bit) of GAMS has to match the bitness of the Python interpreter.
 
-.. note:: It is a good idea to get familiar with
-   the `tabular datapackage specification <https://frictionlessdata.io/specs/tabular-data-package/>`_
-   before continuing.
+Databases can be exported to GAMS :literal:`.gdx` files by the *Exporter* project item.
+When a project is executed, *Exporter* writes its output files to its data folder
+and forwards file paths to project items downstream.
+If a *Tool* is to use such a file, remember to add the file as one of the *Tool specification*'s input files!
 
-To convert a datapackage into a Spine database you have two options:
+The mapping between entities in a Spine database and GAMS is as follows:
 
-A. Using the **Spine datapackage editor**:
-   select **File -> Export to Spine format** from the main menu, and then enter the name and location of the
-   destination Spine database file.
-B. Using the **Tree view**:
-   select **File -> Import** from the main menu, and then select a valid 'datapackage.json' file.
+====================== =========================
+Database entity        GAMS entity
+====================== =========================
+Object class           Universal set (or domain)
+Object                 Universal set member
+Object parameter       Parameter
+Relationship class     Subset of universal sets
+Relationship           Subset member
+Relationship parameter Parameter
+====================== =========================
 
+.. note::
+   Currently, it is not possible to use subsets (relationship classes) as dimensions for other
+   subsets due to technical limitations.
+   For example, if there is a domain **A(*)** and a subset **foo(A)**,
+   a subset of **foo** has to be expressed as **bar(A)** instead of **bar(foo)**.
 
-Basic mapping rules
-~~~~~~~~~~~~~~~~~~~
+It is also possible to designate a single object class as a *Global parameter*.
+The parameters of the objects of that class will be exported as GAMS scalars.
 
-* Each resource in the datapackage is mapped to an *object class* in the Spine database.
-* If no primary or foreign keys are specified,
-  each field in a resource's schema is mapped to a *parameter*,
-  associated with the *object class* mapped by the resource.
-* Each row in a resource's data is mapped to an *object* of the *object class* mapped by the resource.
-* The value of each field in a row is mapped to a *parameter value*, for the *object* mapped by the row and the
-  *parameter* mapped by the field.
+Some GAMS models need their data to be in a specific order in the :literal:`.gdx`.
+This is not directly supported by the database.
+Rather, user has to specify the desired exporting order using the *Exporter* item's settings.
 
-Example
-=======
-
-Let's say we have a datapackage with two resources named 'dog' and 'guy', with no primary or foreign keys, and
-data given by the following CSV files:
-
-``dog.csv``::
-
-    name, breed, owner
-    pluto, bloodhound, mickey
-    scooby, great dane, shaggy
-    brian, labrador, peter
-
-
-``guy.csv``::
-
-   name, age
-   peter, 40
-   shaggy, 20
-   mickey, 5
-
-After conversion, the following content will be in the Spine database (empty fields are not shown):
-
-* **object class**
-
-  +---------+-----------+
-  | **id**  | **name**  |
-  +---------+-----------+
-  | 1       | dog       |
-  +---------+-----------+
-  | 2       | guy       |
-  +---------+-----------+
-
-* **object**
-
-  +---------+---------------+-----------+
-  | **id**  | **class_id**  | **name**  |
-  +---------+---------------+-----------+
-  | 1       | 1 (dog)       | dog_1     |
-  +---------+---------------+-----------+
-  | 2       | 1 (dog)       | dog_2     |
-  +---------+---------------+-----------+
-  | 3       | 1 (dog)       | dog_3     |
-  +---------+---------------+-----------+
-  | 4       | 2 (guy)       | guy_1     |
-  +---------+---------------+-----------+
-  | 5       | 2 (guy)       | guy_2     |
-  +---------+---------------+-----------+
-  | 6       | 2 (guy)       | guy_3     |
-  +---------+---------------+-----------+
-
-
-* **parameter**
-
-  +---------+----------------------+------------+
-  | **id**  | **object_class_id**  | **name**   |
-  +---------+----------------------+------------+
-  | 1       | 1 (dog)              | dog_name   |
-  +---------+----------------------+------------+
-  | 2       | 1 (dog)              | dog_breed  |
-  +---------+----------------------+------------+
-  | 3       | 1 (dog)              | dog_owner  |
-  +---------+----------------------+------------+
-  | 4       | 2 (guy)              | guy_name   |
-  +---------+----------------------+------------+
-  | 5       | 2 (guy)              | guy_age    |
-  +---------+----------------------+------------+
-
-* **parameter value**
-
-  +----------------+------------------+------------+
-  | **object_id**  | **parameter_id** | **value**  |
-  +----------------+------------------+------------+
-  | 1 (dog_1)      | 1 (dog_name)     | pluto      |
-  +----------------+------------------+------------+
-  | 2 (dog_2)      | 1 (dog_name)     | scooby     |
-  +----------------+------------------+------------+
-  | 3 (dog_3)      | 1 (dog_name)     | brian      |
-  +----------------+------------------+------------+
-  | 1 (dog_1)      | 2 (dog_breed)    | bloodhound |
-  +----------------+------------------+------------+
-  | 2 (dog_2)      | 2 (dog_breed)    | great dane |
-  +----------------+------------------+------------+
-  | 3 (dog_3)      | 2 (dog_breed)    | labrador   |
-  +----------------+------------------+------------+
-  | 1 (dog_1)      | 3 (dog_owner)    | mickey     |
-  +----------------+------------------+------------+
-  | 2 (dog_2)      | 3 (dog_owner)    | shaggy     |
-  +----------------+------------------+------------+
-  | 3 (dog_3)      | 3 (dog_owner)    | peter      |
-  +----------------+------------------+------------+
-  | 4 (guy_1)      | 4 (guy_name)     | peter      |
-  +----------------+------------------+------------+
-  | 5 (guy_2)      | 4 (guy_name)     | shaggy     |
-  +----------------+------------------+------------+
-  | 6 (guy_3)      | 4 (guy_name)     | mickey     |
-  +----------------+------------------+------------+
-  | 4 (guy_1)      | 5 (guy_age)      | 40         |
-  +----------------+------------------+------------+
-  | 5 (guy_2)      | 5 (guy_age)      | 20         |
-  +----------------+------------------+------------+
-  | 6 (guy_3)      | 5 (guy_age)      | 5          |
-  +----------------+------------------+------------+
-
-
-Handling primary keys
+Exporter Project Item
 ~~~~~~~~~~~~~~~~~~~~~
 
-If a primary key is specified for a resource, then fields in the primary key **are not** mapped to
-*parameters* in the database. Consequently, the values of these fields in a given row **are not** mapped to
-*parameter values*. Instead, these values are used to compose the name of the *object* mapped by that row.
+The image below shows the settings tab of *Exporter* with two *Data Sources* connected to it.
 
+.. image:: img/exporter_properties.png
+   :align: center
 
-Example
-=======
+For each connected *Data Store* a box with the database's URL and export file name field is shown on the tab.
+The *Settings...* buttons open *Gdx Export settings* windows to allow editing database specific export parameters
+such as the order in which entities are exported from the database.
 
-Let's say we specify a primary key for our 'dog' and 'guy' resources, so that our ``datapackage.json``
-looks as follows (irrelevant fields are skipped):
+.. image:: img/gdx_export_settings_window.png
+   :align: center
 
-``datapackage.json``::
+The *Gdx Export settings* window (see above) contains a *Sets* list which shows all GAMS sets (gray background) and
+subsets that are available in the database. The sets are exported in the order they are shown in the list.
+The *Move Up* and *Move Down* buttons can be used to move the selected set around.
+Note that you cannot mix sets with subsets so all sets always get exported before the subsets.
 
-  {
-    "profile": "tabular-data-resource",
-    ...
-    "resources": [
-      "name": "dog",
-      ...
-      "schema": {
-        ...
-        "primaryKey": "name"
-      },
-      "name": "guy",
-      ...
-      "schema": {
-        ...
-        "primaryKey": "name"
-      }
-    ]
-  }
+The checkbox next to the set name is used to control which sets are actually exported.
+Note that it is not possible to change this setting for certain sets.
+Global parameters domain is never exported, only its parameters which become GAMS scalars.
+Further, sets created for *Indexed paramaters* are always exported.
 
-So in both cases, the primary key is uniquely composed by the field 'name'.
-After conversion, the following content will be in the Spine database (empty fields are not shown):
+The *Set Contents* box lists the members of the selected set or subset.
+Their order of export can be changed the same way as with sets by *Move Up* and *Move Down*.
+The *Alphabetic* button sorts the members alphabetically.
 
-* **object class**
+Time series and time patterns cannot be exported as-is. They need to be tied up to a GAMS set.
+This can be achieved from the window that opens from the *Indexed parameters...* button.
+See the `Exporting time series and patterns`_ section below for more information.
 
-  +---------+-----------+
-  | **id**  | **name**  |
-  +---------+-----------+
-  | 1       | dog       |
-  +---------+-----------+
-  | 2       | guy       |
-  +---------+-----------+
+Finally, one of the sets can be designated as the global parameter set.
+This is achieved by choosing the set's name in the *Global parameters domain* box.
+Note that this set is not exported, only its parameters are. They end up as GAMS scalars.
 
-* **object**
+Exporting time series and patterns
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  +---------+---------------+-------------+
-  | **id**  | **class_id**  | **name**    |
-  +---------+---------------+-------------+
-  | 1       | 1 (dog)       | dog_pluto   |
-  +---------+---------------+-------------+
-  | 2       | 1 (dog)       | dog_scooby  |
-  +---------+---------------+-------------+
-  | 3       | 1 (dog)       | dog_brian   |
-  +---------+---------------+-------------+
-  | 4       | 2 (guy)       | guy_peter   |
-  +---------+---------------+-------------+
-  | 5       | 2 (guy)       | guy_shaggy  |
-  +---------+---------------+-------------+
-  | 6       | 2 (guy)       | guy_mickey  |
-  +---------+---------------+-------------+
+Since GAMS has no notion of time series or time patterns these types need special handling when exported
+to a :literal:`.gdx` file. Namely, the time stamps or time periods (i.e. parameter indexes) need be available
+as GAMS sets in the exported file. It is possible to use an existing set or create a new one for this purpose.
+The functionality is available in *Gdx Parameter Indexing Settings* window
+accessible from the *Indexed Parameters...* button.
 
+.. image:: img/gdx_export_parameter_indexing_window_using_existing_domain.png
+   :align: center
 
-* **parameter**
+The above figure shows the indexing settings when an existing GAMS set is used to replace the original
+time stamps of a time series in a parameter called 'size'. The choice between using an existing set or
+creating a new one can be changed by the *Use existing domain* and *Create new index domain* radio buttons.
+When using an existing set it is selected by the combo box.
+In the above figure, *ALL TS* set is used for indexing.
 
-  +---------+----------------------+------------+
-  | **id**  | **object_class_id**  | **name**   |
-  +---------+----------------------+------------+
-  | 1       | 1 (dog)              | dog_breed  |
-  +---------+----------------------+------------+
-  | 2       | 1 (dog)              | dog_owner  |
-  +---------+----------------------+------------+
-  | 3       | 2 (guy)              | guy_age    |
-  +---------+----------------------+------------+
+In case of existing set it is possible that not all the set's contents are used for indexing.
+The table occupying the right side of the above figure shows which of the set's keys index which parameter values.
+The first column contains the keys of the currently selected set whereas the other columns contain the parameter's
+values, one column for each object that has the parameter.
+Selecting and deselecting rows in the table changes the indexing as only the keys on selected rows are used to
+index the parameter.
+**Shift**, **ctrl** and **ctrl-A** help in manual selection.
+If the selected indexes have certain pattern it might be useful to utilize the *Label picking expression* field
+which selects the set keys using a Python expression returning a boolean value. Some examples:
 
-* **parameter value**
+====================================== ============================
+Expression                             Effect
+====================================== ============================
+:literal:`i == 3`                      Select the third row only
+:literal:`i % 2 == 0`                  Select even rows
+:literal:`(i + 1) % 2 == 0 and i != 9` Select odd rows except row 9
+====================================== ============================
 
-  +-----------------+------------------+------------+
-  | **object_id**   | **parameter_id** | **value**  |
-  +-----------------+------------------+------------+
-  | 1 (dog_pluto)   | 1 (dog_breed)    | bloodhound |
-  +-----------------+------------------+------------+
-  | 2 (dog_scooby)  | 1 (dog_breed)    | great dane |
-  +-----------------+------------------+------------+
-  | 3 (dog_brian)   | 1 (dog_breed)    | labrador   |
-  +-----------------+------------------+------------+
-  | 1 (dog_pluto)   | 2 (dog_owner)    | mickey     |
-  +-----------------+------------------+------------+
-  | 2 (dog_scooby)  | 2 (dog_owner)    | shaggy     |
-  +-----------------+------------------+------------+
-  | 3 (dog_brian)   | 2 (dog_owner)    | peter      |
-  +-----------------+------------------+------------+
-  | 4 (guy_peter)   | 3 (guy_age)      | 40         |
-  +-----------------+------------------+------------+
-  | 5 (guy_shaggy)  | 3 (guy_age)      | 20         |
-  +-----------------+------------------+------------+
-  | 6 (guy_mickey)  | 3 (guy_age)      | 5          |
-  +-----------------+------------------+------------+
+The *Indexing domains* list allows to shuffle the order of the parameter's dimensions.
+The **bold** dimension is the new dimension that is added to the parameter.
+It can be moved around by the *Move Left* and *Move Right* buttons.
 
+.. image:: img/gdx_export_parameter_indexing_window_using_new_domain.png
+   :align: center
 
-Handling foreign keys
-~~~~~~~~~~~~~~~~~~~~~
+It is possible to create a new indexing set by choosing *Create new index domain* as shown in the figure above.
+*Domain name* is mandatory for the new domain. A *Description* can also be provided but it is optional.
+There are two options to generate the index keys: extract the time stamps or time periods from the parameter
+itself or generate them using a Python expression.
+The *Extract index from parameter* button can be used to extract the keys from the parameter.
+The *Generator expression* field, on the other hand, is used to generate index keys for the new set.
+The expression should return Python object that is convertible to string.
+Below are some example expressions:
 
-If foreign keys are specified for a given resource, then fields in any foreign key **are not** mapped to
-*parameters* in the database. Instead, these fields are mapped to a *relationship class*, between the
-*object classes* mapped by the resource and the reference resources.
-
-
-Let's say we specify a foreign key for our 'dog' resource, so that our ``datapackage.json``
-looks as follows (irrelevant fields are skipped):
-
-``datapackage.json``::
-
-  {
-    "profile": "tabular-data-resource",
-    ...
-    "resources": [
-      "name": "dog",
-      ...
-      "schema": {
-        ...
-        "foreignKeys": [
-          "fields": "owner"
-          "reference": {
-            "resource": "guy",
-            "fields": "name"
-          }
-        ]
-      },
-      ...
-    ]
-  }
-
-So the field 'owner' of 'dog' points to the field 'name' of 'guy'.
-After conversion, the following content will be in the Spine database (empty fields are not shown):
-
-* **object class**
-
-  +---------+-----------+
-  | **id**  | **name**  |
-  +---------+-----------+
-  | 1       | dog       |
-  +---------+-----------+
-  | 2       | guy       |
-  +---------+-----------+
-
-* **object**
-
-  +---------+---------------+-------------+
-  | **id**  | **class_id**  | **name**    |
-  +---------+---------------+-------------+
-  | 1       | 1 (dog)       | dog_pluto   |
-  +---------+---------------+-------------+
-  | 2       | 1 (dog)       | dog_scooby  |
-  +---------+---------------+-------------+
-  | 3       | 1 (dog)       | dog_brian   |
-  +---------+---------------+-------------+
-  | 4       | 2 (guy)       | guy_peter   |
-  +---------+---------------+-------------+
-  | 5       | 2 (guy)       | guy_shaggy  |
-  +---------+---------------+-------------+
-  | 6       | 2 (guy)       | guy_mickey  |
-  +---------+---------------+-------------+
-
-* **relationship_class**
-
-  +--------+---------------+---------------------+----------+
-  | **id** | **dimension** | **object_class_id** | **name** |
-  +--------+---------------+---------------------+----------+
-  | 1      | 1             | 1 (dog)             | dog__guy |
-  +--------+---------------+---------------------+----------+
-  | 1      | 2             | 2 (guy)             | dog__guy |
-  +--------+---------------+---------------------+----------+
-
-* **relationship**
-
-+--------+---------------+----------------+--------------+-------------+
-| **id** | **dimension** | **object_id**  | **class_id** | **name**    |
-+--------+---------------+----------------+--------------+-------------+
-| 1      | 1             | 1 (dog_pluto)  | 1 (dog__guy) | *undefined* |
-+--------+---------------+----------------+--------------+-------------+
-| 1      | 2             | 6 (guy_mickey) | 1 (dog__guy) | *undefined* |
-+--------+---------------+----------------+--------------+-------------+
-| 2      | 1             | 2 (dog_scooby) | 1 (dog__guy) | *undefined* |
-+--------+---------------+----------------+--------------+-------------+
-| 2      | 2             | 5 (guy_shaggy) | 1 (dog__guy) | *undefined* |
-+--------+---------------+----------------+--------------+-------------+
-| 3      | 1             | 3 (dog_brian)  | 1 (dog__guy) | *undefined* |
-+--------+---------------+----------------+--------------+-------------+
-| 3      | 2             | 4 (guy_peter)  | 1 (dog__guy) | *undefined* |
-+--------+---------------+----------------+--------------+-------------+
-
-
-* **parameter**
-
-  +---------+----------------------+------------+
-  | **id**  | **object_class_id**  | **name**   |
-  +---------+----------------------+------------+
-  | 1       | 1 (dog)              | dog_breed  |
-  +---------+----------------------+------------+
-  | 2       | 2 (guy)              | guy_age    |
-  +---------+----------------------+------------+
-
-* **parameter value**
-
-  +-----------------+------------------+------------+
-  | **object_id**   | **parameter_id** | **value**  |
-  +-----------------+------------------+------------+
-  | 1 (dog_pluto)   | 1 (dog_breed)    | bloodhound |
-  +-----------------+------------------+------------+
-  | 2 (dog_scooby)  | 1 (dog_breed)    | great dane |
-  +-----------------+------------------+------------+
-  | 3 (dog_brian)   | 1 (dog_breed)    | labrador   |
-  +-----------------+------------------+------------+
-  | 4 (guy_peter)   | 2 (guy_age)      | 40         |
-  +-----------------+------------------+------------+
-  | 5 (guy_shaggy)  | 2 (guy_age)      | 20         |
-  +-----------------+------------------+------------+
-  | 6 (guy_mickey)  | 2 (guy_age)      | 5          |
-  +-----------------+------------------+------------+
+======================== ====================
+Expression               Keys
+======================== ====================
+:literal:`i`             1, 2, 3,...
+:literal:`f"{i - 1:04}"` 0000, 0001, 0002,...
+:literal:`f"T{i:03}"`    T001, T002, T003,...
+======================== ====================

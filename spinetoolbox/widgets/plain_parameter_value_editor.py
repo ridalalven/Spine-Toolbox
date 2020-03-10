@@ -1,5 +1,5 @@
 ######################################################################################################################
-# Copyright (C) 2017-2019 Spine project consortium
+# Copyright (C) 2017-2020 Spine project consortium
 # This file is part of Spine Toolbox.
 # Spine Toolbox is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General
 # Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
@@ -18,20 +18,16 @@ An editor widget for editing plain number database (relationship) parameter valu
 
 from PySide2.QtCore import Slot
 from PySide2.QtWidgets import QWidget
-from ui.plain_parameter_value_editor import Ui_PlainParameterValueEditor
 
 
 class _ValueModel:
-    """
-    A model to handle the parameter value in the editor.
-
-    Mostly useful because of the handy conversion of strings to floats or booleans.
-
-    Attributes:
-        value (float, bool): a parameter value
-    """
-
     def __init__(self, value):
+        """A model to handle the parameter value in the editor.
+        Mostly useful because of the handy conversion of strings to floats or booleans.
+
+        Args:
+            value (float, bool): a parameter value
+        """
         self._value = value
 
     @property
@@ -63,6 +59,8 @@ class PlainParameterValueEditor(QWidget):
     """
 
     def __init__(self, parent_widget=None):
+        from ..ui.plain_parameter_value_editor import Ui_PlainParameterValueEditor
+
         super().__init__(parent_widget)
         self._ui = Ui_PlainParameterValueEditor()
         self._ui.setupUi(self)

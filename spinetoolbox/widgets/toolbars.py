@@ -1,5 +1,5 @@
 ######################################################################################################################
-# Copyright (C) 2017 - 2019 Spine project consortium
+# Copyright (C) 2017-2020 Spine project consortium
 # This file is part of Spine Toolbox.
 # Spine Toolbox is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General
 # Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
@@ -29,56 +29,37 @@ from PySide2.QtWidgets import (
     QToolButton,
 )
 from PySide2.QtGui import QIcon, QDrag
-from config import ICON_TOOLBAR_SS, PARAMETER_TAG_TOOLBAR_SS
+from ..config import ICON_TOOLBAR_SS, PARAMETER_TAG_TOOLBAR_SS
 
 
 class ItemToolBar(QToolBar):
-    """A toolbar to add items using drag and drop actions.
-
-    Attributes:
-        parent (ToolboxUI): QMainWindow instance
-    """
+    """A toolbar to add items using drag and drop actions."""
 
     # noinspection PyUnresolvedReferences, PyUnusedLocal
     def __init__(self, parent):
-        """Init class."""
+        """
+
+        Args:
+            parent (ToolboxUI): QMainWindow instance
+        """
         super().__init__("Add Item Toolbar", parent=parent)  # Inherits stylesheet from ToolboxUI
         self._toolbox = parent
         label = QLabel("Drag & Drop Icon")
         self.addWidget(label)
-        # Data Store
-        data_store_pixmap = QIcon(":/icons/project_item_icons/database.svg").pixmap(24, 24)
-        data_store_widget = DraggableWidget(self, data_store_pixmap, "Data Store")
-        self.addWidget(data_store_widget)
-        # Data Connection
-        data_connection_pixmap = QIcon(":/icons/project_item_icons/file-alt.svg").pixmap(24, 24)
-        data_connection_widget = DraggableWidget(self, data_connection_pixmap, "Data Connection")
-        self.addWidget(data_connection_widget)
-        # Tool
-        tool_pixmap = QIcon(":/icons/project_item_icons/hammer.svg").pixmap(24, 24)
-        tool_widget = DraggableWidget(self, tool_pixmap, "Tool")
-        self.addWidget(tool_widget)
-        # View
-        view_pixmap = QIcon(":/icons/project_item_icons/binoculars.svg").pixmap(24, 24)
-        view_widget = DraggableWidget(self, view_pixmap, "View")
-        self.addWidget(view_widget)
-        # Data Interface
-        data_interface_pixmap = QIcon(":/icons/project_item_icons/map-solid.svg").pixmap(24, 24)
-        data_interface_widget = DraggableWidget(self, data_interface_pixmap, "Data Interface")
-        self.addWidget(data_interface_widget)
+        icon_size = 24
         # set remove all action
-        remove_all_icon = QIcon(":/icons/menu_icons/trash-alt.svg").pixmap(24, 24)
+        remove_all_icon = QIcon(":/icons/menu_icons/trash-alt.svg").pixmap(icon_size, icon_size)
         remove_all = QToolButton(parent)
         remove_all.setIcon(remove_all_icon)
         remove_all.clicked.connect(self.remove_all)
         remove_all.setToolTip("Remove all items from project.")
-        self.addSeparator()
+        self.tool_separator = self.addSeparator()
         self.addWidget(remove_all)
         # Execute label and button
         self.addSeparator()
         ex_label = QLabel("Execute")
         self.addWidget(ex_label)
-        execute_project_icon = QIcon(":/icons/project_item_icons/play-circle-solid.svg").pixmap(24, 24)
+        execute_project_icon = QIcon(":/icons/project_item_icons/play-circle-solid.svg").pixmap(icon_size, icon_size)
         execute_project = QToolButton(parent)
         execute_project.setIcon(execute_project_icon)
         execute_project.clicked.connect(self.execute_project)
@@ -86,32 +67,36 @@ class ItemToolBar(QToolBar):
         self.addWidget(execute_project)
         # ex_selected_label = QLabel("Execute Selected")
         # self.addWidget(ex_selected_label)
-        execute_selected_icon = QIcon(":/icons/project_item_icons/play-circle-regular.svg").pixmap(24, 24)
+        execute_selected_icon = QIcon(":/icons/project_item_icons/play-circle-regular.svg").pixmap(icon_size, icon_size)
         execute_selected = QToolButton(parent)
         execute_selected.setIcon(execute_selected_icon)
         execute_selected.clicked.connect(self.execute_selected)
         execute_selected.setToolTip("Execute selection.")
         self.addWidget(execute_selected)
         self.addSeparator()
-        stop_icon = QIcon(":/icons/project_item_icons/stop-circle-regular.svg").pixmap(24, 24)
+        stop_icon = QIcon(":/icons/project_item_icons/stop-circle-regular.svg").pixmap(icon_size, icon_size)
         stop = QToolButton(parent)
         stop.setIcon(stop_icon)
         stop.clicked.connect(self.stop_execution)
         stop.setToolTip("Stop execution.")
         self.addWidget(stop)
-        # Data label and button
-        self.addSeparator()
-        data_label = QLabel("Data")
-        self.addWidget(data_label)
-        open_tree_view_icon = QIcon(":/icons/project_item_icons/tree.svg").pixmap(24, 24)
-        open_tree_view = QToolButton(parent)
-        open_tree_view.setIcon(open_tree_view_icon)
-        open_tree_view.clicked.connect(self.open_tree_view)
-        open_tree_view.setToolTip("Open selected data stores in tree view.")
-        self.addWidget(open_tree_view)
         # Set stylesheet
         self.setStyleSheet(ICON_TOOLBAR_SS)
         self.setObjectName("ItemToolbar")
+
+    def add_draggable_widgets(self, category_icon):
+        """Adds draggable widgets from the given list.
+
+        Args:
+            category_icon (list): List of tuples (item_type (str), item category (str), icon path (str))
+        """
+        widgets = list()
+        for item_type, category, icon in category_icon:
+            pixmap = QIcon(icon).pixmap(24, 24)
+            widget = DraggableWidget(self, pixmap, item_type, category)
+            widgets.append(widget)
+        for widget in widgets:
+            self.insertWidget(self.tool_separator, widget)
 
     @Slot(bool, name="remove_all")
     def remove_all(self, checked=False):
@@ -145,31 +130,25 @@ class ItemToolBar(QToolBar):
             return
         self._toolbox.project().stop()
 
-    @Slot(bool, name="open_tree_view")
-    def open_tree_view(self, checked=False):
-        """Slot for handling the Open tree view tool button clicked signal."""
-        if not self._toolbox.project():
-            self._toolbox.msg.emit("Please create a new project or open an existing one first")
-            return
-        self._toolbox.project().open_tree_view()
-
 
 class DraggableWidget(QLabel):
-    """A draggable QLabel.
+    """A draggable QLabel."""
 
-    Attributes:
-        parent (QWidget): Parent widget
-        pixmap (QPixMap): Picture for the label
-        text (str): Item type
-    """
+    def __init__(self, parent, pixmap, item_type, category):
+        """
 
-    def __init__(self, parent, pixmap, text):
-        super().__init__(parent=parent)  # Parent passed to QFrame constructor. Inherits stylesheet from ToolboxUI.
-        self.text = text
+        Args:
+            parent (QWidget): Parent widget
+            pixmap (QPixMap): Picture for the label
+            item_type (str): Item type (e.g. Data Store, Data Connection, etc...)
+            category (str): Item category (e.g. Data Stores, Data Connetions, etc...)
+        """
+        super().__init__(parent=parent)  # Parent passed to QLabel constructor. Inherits stylesheet from ToolboxUI.
+        self.category = category
         self.setPixmap(pixmap)
         self.drag_start_pos = None
         self.setToolTip(
-            "<p>Drag-and-drop this icon into the Design View to create a new <b>{}</b> item.</p>".format(self.text)
+            "<p>Drag-and-drop this icon into the Design View to create a new <b>{}</b> item.</p>".format(item_type)
         )
         self.setAlignment(Qt.AlignHCenter)
         self.setAttribute(Qt.WA_DeleteOnClose)
@@ -190,7 +169,7 @@ class DraggableWidget(QLabel):
             return
         drag = QDrag(self)
         mime_data = QMimeData()
-        mime_data.setText(self.text)
+        mime_data.setText(self.category)
         drag.setMimeData(mime_data)
         drag.setPixmap(self.pixmap())
         drag.setHotSpot(self.pixmap().rect().center())
@@ -202,19 +181,22 @@ class DraggableWidget(QLabel):
 
 
 class ParameterTagToolBar(QToolBar):
-    """A toolbar to add items using drag and drop actions.
+    """A toolbar to add items using drag and drop actions."""
 
-    Attributes:
-        parent (DataStoreForm): tree or graph view form
-    """
+    tag_button_toggled = Signal("QVariant", "bool")
+    manage_tags_action_triggered = Signal("bool")
 
-    tag_button_toggled = Signal("QVariant", "bool", name="tag_button_toggled")
-    manage_tags_action_triggered = Signal("bool", name="manage_tags_action_triggered")
+    def __init__(self, parent, db_mngr, *db_maps):
+        """
 
-    def __init__(self, parent):
-        """Init class"""
+        Args:
+            parent (DataStoreForm): tree or graph view form
+            db_mngr (SpineDBManager): the DB manager for interacting with the db
+            db_maps (iter): DiffDatabaseMapping instances
+        """
         super().__init__("Parameter Tag Toolbar", parent=parent)
-        self._parent = parent
+        self.db_mngr = db_mngr
+        self.db_maps = db_maps
         label = QLabel("Parameter tag")
         self.addWidget(label)
         self.tag_button_group = QButtonGroup(self)
@@ -243,41 +225,50 @@ class ParameterTagToolBar(QToolBar):
         button = self.widgetForAction(action)
         self.tag_button_group.addButton(button, id=0)
         self.actions = [action]
-        self.db_map_ids = [[(db_map, 0) for db_map in self._parent.db_maps]]
-        tag_dict = {}
-        for db_map in self._parent.db_maps:
-            for parameter_tag in db_map.parameter_tag_list():
-                tag_dict.setdefault(parameter_tag.tag, {})[db_map] = parameter_tag.id
-        for tag, db_map_dict in tag_dict.items():
+        self.db_map_ids = [[(db_map, 0) for db_map in self.db_maps]]
+        tag_data = {}
+        for db_map in self.db_maps:
+            for parameter_tag in self.db_mngr.get_parameter_tags(db_map):
+                tag_data.setdefault(parameter_tag["tag"], {})[db_map] = parameter_tag["id"]
+        for tag, db_map_data in tag_data.items():
             action = QAction(tag)
             self.insertAction(self.empty_action, action)
             action.setCheckable(True)
             button = self.widgetForAction(action)
             self.tag_button_group.addButton(button, id=len(self.db_map_ids))
             self.actions.append(action)
-            self.db_map_ids.append([(db_map, id_) for db_map, id_ in db_map_dict.items()])
+            self.db_map_ids.append(list(db_map_data.items()))
         self.tag_button_group.buttonToggled["int", "bool"].connect(
-            lambda id, checked: self.tag_button_toggled.emit(self.db_map_ids[id], checked)
+            lambda i, checked: self.tag_button_toggled.emit(self.db_map_ids[i], checked)
         )
 
-    def add_tag_actions(self, db_map, parameter_tags):
+    def receive_parameter_tags_added(self, db_map_data):
+        for db_map, parameter_tags in db_map_data.items():
+            self._add_db_map_tag_actions(db_map, parameter_tags)
+
+    def _add_db_map_tag_actions(self, db_map, parameter_tags):
         action_texts = [a.text() for a in self.actions]
         for parameter_tag in parameter_tags:
-            if parameter_tag.tag in action_texts:
+            if parameter_tag["tag"] in action_texts:
                 # Already a tag named after that, add db_map id information
-                i = action_texts.index(parameter_tag.tag)
-                self.db_map_ids[i].append((db_map, parameter_tag.id))
+                i = action_texts.index(parameter_tag["tag"])
+                self.db_map_ids[i].append((db_map, parameter_tag["id"]))
             else:
-                action = QAction(parameter_tag.tag)
+                action = QAction(parameter_tag["tag"])
                 self.insertAction(self.empty_action, action)
                 action.setCheckable(True)
                 button = self.widgetForAction(action)
                 self.tag_button_group.addButton(button, id=len(self.db_map_ids))
                 self.actions.append(action)
-                self.db_map_ids.append([(db_map, parameter_tag.id)])
+                self.db_map_ids.append([(db_map, parameter_tag["id"])])
                 action_texts.append(action.text())
 
-    def remove_tag_actions(self, db_map, parameter_tag_ids):
+    def receive_parameter_tags_removed(self, db_map_data):
+        for db_map, parameter_tags in db_map_data.items():
+            parameter_tag_ids = {x["id"] for x in parameter_tags}
+            self._remove_db_map_tag_actions(db_map, parameter_tag_ids)
+
+    def _remove_db_map_tag_actions(self, db_map, parameter_tag_ids):
         for tag_id in parameter_tag_ids:
             i = next(k for k, x in enumerate(self.db_map_ids) if (db_map, tag_id) in x)
             self.db_map_ids[i].remove((db_map, tag_id))
@@ -285,8 +276,12 @@ class ParameterTagToolBar(QToolBar):
                 self.db_map_ids.pop(i)
                 self.removeAction(self.actions.pop(i))
 
-    def update_tag_actions(self, db_map, parameter_tags):
+    def receive_parameter_tags_updated(self, db_map_data):
+        for db_map, parameter_tags in db_map_data.items():
+            self._update_db_map_tag_actions(db_map, parameter_tags)
+
+    def _update_db_map_tag_actions(self, db_map, parameter_tags):
         for parameter_tag in parameter_tags:
-            i = next(k for k, x in enumerate(self.db_map_ids) if (db_map, parameter_tag.id) in x)
+            i = next(k for k, x in enumerate(self.db_map_ids) if (db_map, parameter_tag["id"]) in x)
             action = self.actions[i]
-            action.setText(parameter_tag.tag)
+            action.setText(parameter_tag["tag"])

@@ -1,5 +1,5 @@
 ######################################################################################################################
-# Copyright (C) 2017 - 2019 Spine project consortium
+# Copyright (C) 2017-2020 Spine project consortium
 # This file is part of Spine Toolbox.
 # Spine Toolbox is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General
 # Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
@@ -20,10 +20,12 @@ import logging
 import math
 from PySide2.QtWidgets import QGraphicsView
 from PySide2.QtGui import QCursor
-from PySide2.QtCore import Signal, Slot, Qt, QRectF, QTimeLine, QMarginsF
-from graphics_items import LinkDrawer, Link
-from widgets.custom_qlistview import DragListView
-from widgets.custom_qgraphicsscene import CustomQGraphicsScene
+from PySide2.QtCore import Signal, Slot, Qt, QRectF, QTimeLine, QMarginsF, QSettings
+from spine_engine import ExecutionDirection
+from ..graphics_items import LinkDrawer, Link
+from ..project_commands import AddLinkCommand, RemoveLinkCommand
+from .custom_qlistview import DragListView
+from .custom_qgraphicsscene import CustomQGraphicsScene
 
 
 class CustomQGraphicsView(QGraphicsView):
@@ -43,6 +45,7 @@ class CustomQGraphicsView(QGraphicsView):
         self._scene_fitting_zoom = 1.0
         self._max_zoom = 10.0
         self._min_zoom = 0.1
+        self._qsettings = QSettings("SpineProject", "Spine Toolbox")
 
     def keyPressEvent(self, event):
         """Overridden method. Enable zooming with plus and minus keys (comma resets zoom).
@@ -73,18 +76,23 @@ class CustomQGraphicsView(QGraphicsView):
         """Set rubber band selection mode if Control pressed.
         Enable resetting the zoom factor from the middle mouse button.
         """
-        if event.modifiers() & Qt.ControlModifier:
-            self.setDragMode(QGraphicsView.RubberBandDrag)
-            self.viewport().setCursor(Qt.CrossCursor)
-        if event.button() == Qt.MidButton:
-            self.reset_zoom()
+        item = self.itemAt(event.pos())
+        # print(not item, not int(item.acceptedMouseButtons() & event.buttons()))
+        if not item or not item.acceptedMouseButtons() & event.buttons():
+            if event.modifiers() & Qt.ControlModifier:
+                self.setDragMode(QGraphicsView.RubberBandDrag)
+                self.viewport().setCursor(Qt.CrossCursor)
+            if event.button() == Qt.MidButton:
+                self.reset_zoom()
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         """Reestablish scroll hand drag mode."""
         super().mouseReleaseEvent(event)
-        self.setDragMode(QGraphicsView.ScrollHandDrag)
-        self.viewport().setCursor(Qt.ArrowCursor)
+        item = self.itemAt(event.pos())
+        if not item or not item.acceptedMouseButtons():
+            self.setDragMode(QGraphicsView.ScrollHandDrag)
+            self.viewport().setCursor(Qt.ArrowCursor)
 
     def wheelEvent(self, event):
         """Zoom in/out.
@@ -96,9 +104,7 @@ class CustomQGraphicsView(QGraphicsView):
             event.ignore()
             return
         event.accept()
-        ui = self.parent().parent()
-        qsettings = ui.qsettings()
-        smooth_zoom = qsettings.value("appSettings/smoothZoom", defaultValue="false")
+        smooth_zoom = self._qsettings.value("appSettings/smoothZoom", defaultValue="false")
         if smooth_zoom == "true":
             num_degrees = event.delta() / 8
             num_steps = num_degrees / 15
@@ -129,7 +135,7 @@ class CustomQGraphicsView(QGraphicsView):
         if new_size != old_size:
             scene = self.scene()
             if scene is not None:
-                self._update_zoom_limits(self.scene().sceneRect())
+                self._update_zoom_limits(scene.sceneRect())
                 if new_size.width() > old_size.width() or new_size.height() > old_size.height():
                     transform = self.transform()
                     zoom = transform.m11()
@@ -143,12 +149,13 @@ class CustomQGraphicsView(QGraphicsView):
         Sets a new scene to this view.
 
         Args:
-            scene (QGraphicsScene): a new scene
+            scene (ShrinkingScene): a new scene
         """
         super().setScene(scene)
         scene.sceneRectChanged.connect(self._update_zoom_limits)
+        scene.item_move_finished.connect(self._ensure_item_visible)
 
-    @Slot("QRectF", name="_update_zoom_limits")
+    @Slot("QRectF")
     def _update_zoom_limits(self, rect):
         """
         Updates the minimum zoom limit and the zoom level with which the entire scene fits the view.
@@ -209,34 +216,39 @@ class CustomQGraphicsView(QGraphicsView):
         elif proposed_zoom > self._max_zoom:
             factor = self._max_zoom / current_zoom
         if math.isclose(factor, 1.0):
-            return
+            return False
         self.scale(factor, factor)
         post_scaling_focus_on_scene = self.mapToScene(zoom_focus)
         center_on_scene = self.mapToScene(self.viewport().rect().center())
         focus_diff = post_scaling_focus_on_scene - initial_focus_on_scene
         self.centerOn(center_on_scene - focus_diff)
+        return True
+
+    @Slot("QGraphicsItem")
+    def _ensure_item_visible(self, item):
+        """Resets zoom if item is not visible."""
+        if not self.viewport().geometry().contains(self.mapFromScene(item.pos())):
+            self.reset_zoom()
 
 
 class DesignQGraphicsView(CustomQGraphicsView):
-    """QGraphicsView for the Design View.
-
-    Attributes:
-        parent (QWidget): Graph View Form's (QMainWindow) central widget (self.centralwidget)
-    """
+    """QGraphicsView for the Design View."""
 
     def __init__(self, parent):
-        """Initialize DesignQGraphicsView."""
+        """
+
+        Args:
+            parent (QWidget): Graph View Form's (QMainWindow) central widget (self.centralwidget)
+        """
         super().__init__(parent=parent)  # Parent is passed to QWidget's constructor
         self._scene = None
         self._toolbox = None
-        self._connection_model = None
         self._project_item_model = None
         self.link_drawer = None
         self.src_connector = None  # Source connector of a link drawing operation
         self.dst_connector = None  # Destination connector of a link drawing operation
         self.src_item_name = None  # Name of source project item when drawing links
         self.dst_item_name = None  # Name of destination project item when drawing links
-        self.show()
 
     def mousePressEvent(self, event):
         """Manage drawing of links. Handle the case where a link is being
@@ -249,6 +261,10 @@ class DesignQGraphicsView(CustomQGraphicsView):
         # This below will trigger connector button if any
         super().mousePressEvent(event)
         if was_drawing:
+            # Enable source connector buttons
+            src_connectors = self.src_connector._parent.connectors.values()
+            for conn in src_connectors:
+                conn.setEnabled(True)
             self.link_drawer.hide()
             # If `drawing` is still `True` here, it means we didn't hit a connector
             if self.link_drawer.drawing:
@@ -266,7 +282,7 @@ class DesignQGraphicsView(CustomQGraphicsView):
             event (QGraphicsSceneMouseEvent): Mouse event
         """
         if self.link_drawer and self.link_drawer.drawing:
-            self.link_drawer.dst = self.mapToScene(event.pos())
+            self.link_drawer.tip = self.mapToScene(event.pos())
             self.link_drawer.update_geometry()
         super().mouseMoveEvent(event)
 
@@ -282,7 +298,7 @@ class DesignQGraphicsView(CustomQGraphicsView):
         Args:
             empty (boolean): True when creating a new project
         """
-        self.link_drawer = LinkDrawer()
+        self.link_drawer = LinkDrawer(self._toolbox)
         self.scene().addItem(self.link_drawer)
         if len(self.scene().items()) == 1:
             # Loaded project has no project items
@@ -292,132 +308,147 @@ class DesignQGraphicsView(CustomQGraphicsView):
             items_rect = self.scene().itemsBoundingRect()
             margin_rect = items_rect.marginsAdded(QMarginsF(20, 20, 20, 20))  # Add margins
             self.scene().setSceneRect(margin_rect)
-            self.centerOn(margin_rect.center())
         else:
             rect = QRectF(0, 0, 401, 301)
             self.scene().setSceneRect(rect)
-            self.centerOn(rect.center())
+        self.scene().update()
         self.reset_zoom()
 
     def set_project_item_model(self, model):
         """Set project item model."""
         self._project_item_model = model
 
-    def set_connection_model(self, model):
-        """Set connection model and connect signals."""
-        self._connection_model = model
-        self._connection_model.rowsAboutToBeRemoved.connect(self.connection_rows_removed)
-        self._connection_model.columnsAboutToBeRemoved.connect(self.connection_columns_removed)
+    def remove_icon(self, icon):
+        """Removes icon and all connected links from scene."""
+        links = set(link for conn in icon.connectors.values() for link in conn.links)
+        for link in links:
+            self.scene().removeItem(link)
+            # Remove Link from connectors
+            link.src_connector.links.remove(link)
+            link.dst_connector.links.remove(link)
+        scene = self.scene()
+        scene.removeItem(icon)
+        scene.shrink_if_needed()
 
-    def add_link(self, src_connector, dst_connector, index):
-        """Draws link between source and sink items on scene and
-        appends connection model. Refreshes View references if needed.
+    def links(self):
+        """Returns all Links in the scene.
+        Used for saving the project."""
+        return [item for item in self.items() if isinstance(item, Link)]
+
+    def add_link(self, src_connector, dst_connector):
+        """
+        Pushes an AddLinkCommand to the toolbox undo stack.
+        """
+        self._toolbox.undo_stack.push(AddLinkCommand(self, src_connector, dst_connector))
+
+    def make_link(self, src_connector, dst_connector):
+        """Returns a Link between given connectors.
 
         Args:
             src_connector (ConnectorButton): Source connector button
             dst_connector (ConnectorButton): Destination connector button
-            index (QModelIndex): Index in connection model
-        """
-        link = Link(self._toolbox, src_connector, dst_connector)
-        self.scene().addItem(link)
-        self._connection_model.setData(index, link)
-        # Refresh View references
-        src_name = src_connector.parent_name()  # Project item name
-        dst_name = dst_connector.parent_name()  # Project item name
-        dst_item_index = self._project_item_model.find_item(dst_name)
-        dst_item = self._project_item_model.project_item(dst_item_index)
-        # TODO: Add refresh signal and method to all project items, so that we don't need check what item is the dst
-        # Refresh View and Data Interface items
-        if dst_item.item_type == "View":
-            dst_item.view_refresh_signal.emit()
-        elif dst_item.item_type == "Data Interface":
-            dst_item.data_interface_refresh_signal.emit()
-        # Add edge (connection link) to a dag as well
-        self._toolbox.project().dag_handler.add_graph_edge(src_name, dst_name)
 
-    def remove_link(self, index):
-        """Removes link between source and sink items on scene and
-        updates connection model. Refreshes View references if needed."""
-        link = self._connection_model.data(index, Qt.UserRole)
-        if not link:
-            logging.error("Link not found. This should not happen.")
-            return False
-        # Source item name
-        src_name = link.src_icon.name()
-        # Find destination item and refresh it is a View
-        dst_name = link.dst_icon.name()
-        dst_item = self._project_item_model.project_item(self._project_item_model.find_item(dst_name))
-        self.scene().removeItem(link)
-        self._connection_model.setData(index, None)
-        # TODO: Add refresh signal and method to all project items, so that we don't need check what item is the dst
-        # Refresh View and Data Interface items
-        if dst_item.item_type == "View":
-            dst_item.view_refresh_signal.emit()
-        elif dst_item.item_type == "Data Interface":
-            dst_item.data_interface_refresh_signal.emit()
+        Returns:
+            Link
+        """
+        return Link(self._toolbox, src_connector, dst_connector)
+
+    def do_add_link(self, src_connector, dst_connector):
+        """Makes a Link between given source and destination connectors and adds it to the project.
+
+        Args:
+            src_connector (ConnectorButton): Source connector button
+            dst_connector (ConnectorButton): Destination connector button
+        """
+        link = self.make_link(src_connector, dst_connector)
+        self._add_link(link)
+
+    def _add_link(self, link):
+        """Adds given Link to the project.
+
+        Args:
+            link (Link): the link to add
+        """
+        replaced_link = self._remove_redundant_link(link)
+        link.src_connector.links.append(link)
+        link.dst_connector.links.append(link)
+        self.scene().addItem(link)
+        src_name = link.src_icon._project_item.name
+        dst_name = link.dst_icon._project_item.name
+        self._toolbox.project().dag_handler.add_graph_edge(src_name, dst_name)
+        return replaced_link
+
+    @staticmethod
+    def _remove_redundant_link(link):
+        """Checks if there's a link with the same source and destination as the given one,
+        wipes it out and returns it.
+
+        Args:
+            link (Link): a new link being added to the project.
+
+        Returns
+            Link, NoneType
+        """
+        for replaced_link in link.src_connector._parent.outgoing_links():
+            if replaced_link.dst_connector._parent == link.dst_connector._parent:
+                replaced_link.wipe_out()
+                return replaced_link
+        return None
+
+    def remove_link(self, link):
+        """Pushes a RemoveLinkCommand to the toolbox undo stack.
+        """
+        self._toolbox.undo_stack.push(RemoveLinkCommand(self, link))
+
+    def do_remove_link(self, link):
+        """Removes link from the project."""
+        link.wipe_out()
         # Remove edge (connection link) from dag
+        src_name = link.src_icon.name()
+        dst_name = link.dst_icon.name()
         self._toolbox.project().dag_handler.remove_graph_edge(src_name, dst_name)
 
-    def take_link(self, index):
+    def take_link(self, link):
         """Remove link, then start drawing another one from the same source connector."""
-        link = self._connection_model.data(index, Qt.UserRole)
-        self.remove_link(index)
+        self.remove_link(link)
         self.draw_links(link.src_connector)
         # noinspection PyArgumentList
-        self.link_drawer.dst = self.mapToScene(self.mapFromGlobal(QCursor.pos()))
+        self.link_drawer.tip = self.mapToScene(self.mapFromGlobal(QCursor.pos()))
         self.link_drawer.update_geometry()
 
-    def restore_links(self):
-        """Iterates connection model and draws links for each valid entry.
-        Should be called only when a project is loaded from a save file."""
-        rows = self._connection_model.rowCount()
-        columns = self._connection_model.columnCount()
-        for row in range(rows):
-            for column in range(columns):
-                index = self._connection_model.index(row, column)
-                data = self._connection_model.data(index, Qt.UserRole)
-                # NOTE: data UserRole returns a list with source and destination positions
-                if data:
-                    try:
-                        src_pos, dst_pos = data
-                    except TypeError:
-                        # Happens when first loading a project that wasn't saved with the current version
-                        src_pos = dst_pos = "bottom"
-                    src_name = self._connection_model.headerData(row, Qt.Vertical, Qt.DisplayRole)
-                    dst_name = self._connection_model.headerData(column, Qt.Horizontal, Qt.DisplayRole)
-                    src = self._project_item_model.find_item(src_name)
-                    src_item = self._project_item_model.project_item(src)
-                    dst = self._project_item_model.find_item(dst_name)
-                    dst_item = self._project_item_model.project_item(dst)
-                    # logging.debug("Cell ({0},{1}):{2} -> Adding link".format(row, column, data))
-                    src_icon = src_item.get_icon()
-                    dst_icon = dst_item.get_icon()
-                    link = Link(self._toolbox, src_icon.conn_button(src_pos), dst_icon.conn_button(dst_pos))
-                    self.scene().addItem(link)
-                    self._connection_model.setData(index, link)
-                    # Add edge (connection link) to dag handler as well
-                    self._toolbox.project().dag_handler.add_graph_edge(src_name, dst_name)
-                else:
-                    # logging.debug("Cell ({0},{1}):{2} -> No link".format(row, column, data))
-                    self._connection_model.setData(index, None)
+    def restore_links(self, connections):
+        """Creates Links from the given connections list.
 
-    @Slot("QModelIndex", "int", "int", name='connection_rows_removed')
-    def connection_rows_removed(self, index, first, last):
-        """Update view when connection model changes."""
-        for i in range(first, last + 1):
-            for j in range(self._connection_model.columnCount()):
-                link = self._connection_model.link(i, j)
-                if link:
-                    self.scene().removeItem(link)
+        - List of dicts is accepted, e.g.
 
-    @Slot("QModelIndex", "int", "int", name='connection_columns_removed')
-    def connection_columns_removed(self, index, first, last):
-        """Update view when connection model changes."""
-        for j in range(first, last + 1):
-            for i in range(self._connection_model.rowCount()):
-                link = self._connection_model.link(i, j)
-                if link:
-                    self.scene().removeItem(link)
+        .. code-block::
+
+            [
+                {"from": ["DC1", "right"], "to": ["Tool1", "left"]},
+                ...
+            ]
+
+        Args:
+            connections (list): List of connections.
+        """
+        if not connections:
+            return
+        for conn in connections:
+            src_name, src_anchor = conn["from"]
+            dst_name, dst_anchor = conn["to"]
+            # Do not restore feedback links
+            if src_name == dst_name:
+                continue
+            src_ind = self._project_item_model.find_item(src_name)
+            dst_ind = self._project_item_model.find_item(dst_name)
+            if not src_ind or not dst_ind:
+                self._toolbox.msg_warning.emit("Restoring a connection failed")
+                continue
+            src_item = self._project_item_model.item(src_ind).project_item
+            src_connector = src_item.get_icon().conn_button(src_anchor)
+            dst_item = self._project_item_model.item(dst_ind).project_item
+            dst_connector = dst_item.get_icon().conn_button(dst_anchor)
+            self.do_add_link(src_connector, dst_connector)
 
     def draw_links(self, connector):
         """Draw links when slot button is clicked.
@@ -428,8 +459,14 @@ class DesignQGraphicsView(CustomQGraphicsView):
         if not self.link_drawer.drawing:
             # start drawing and remember source connector
             self.link_drawer.drawing = True
-            self.link_drawer.start_drawing_at(connector.sceneBoundingRect())
+            self.link_drawer.start_drawing_at(connector)
             self.src_connector = connector
+            # Disable source connector buttons
+            # These are enabled again in DesignQGraphicsView.mousePressEvent
+            parent_icon = self.src_connector._parent  # ProjectItemIcon
+            for conn in parent_icon.connectors.values():
+                conn.setEnabled(False)
+                conn.setBrush(conn.brush)  # Remove hover brush from src connector that was clicked
         else:
             # stop drawing and make connection
             self.link_drawer.drawing = False
@@ -437,82 +474,56 @@ class DesignQGraphicsView(CustomQGraphicsView):
             self.src_item_name = self.src_connector.parent_name()
             self.dst_item_name = self.dst_connector.parent_name()
             # create connection
-            row = self._connection_model.header.index(self.src_item_name)
-            column = self._connection_model.header.index(self.dst_item_name)
-            index = self._connection_model.createIndex(row, column)
-            if self._connection_model.data(index, Qt.DisplayRole) == "True":
-                # Remove current link, so it gets updated
-                self.remove_link(index)
-            self.add_link(self.src_connector, self.dst_connector, index)
-            self.emit_connection_information_message()
+            self.add_link(self.src_connector, self.dst_connector)
+            self.notify_destination_items()
 
-    def emit_connection_information_message(self):
-        """Inform user about what connections are implemented and how they work."""
-        if self.src_item_name == self.dst_item_name:
-            self._toolbox.msg_warning.emit("Link established. Feedback link functionality not implemented.")
-        else:
-            src_index = self._project_item_model.find_item(self.src_item_name)
-            if not src_index:
-                logging.error("Item %s not found", self.src_item_name)
-                return
-            dst_index = self._project_item_model.find_item(self.dst_item_name)
-            if not dst_index:
-                logging.error("Item %s not found", self.dst_item_name)
-                return
-            src_item_type = self._project_item_model.project_item(src_index).item_type
-            dst_item_type = self._project_item_model.project_item(dst_index).item_type
-            if src_item_type == "Data Connection" and dst_item_type == "Tool":
-                self._toolbox.msg.emit(
-                    "Link established. Tool <b>{0}</b> will look for input "
-                    "files from <b>{1}</b>'s references and data directory.".format(
-                        self.dst_item_name, self.src_item_name
-                    )
-                )
-            elif src_item_type == "Data Store" and dst_item_type == "Tool":
-                self._toolbox.msg.emit(
-                    "Link established. Data Store <b>{0}</b> reference will "
-                    "be passed to Tool <b>{1}</b> when executing.".format(self.src_item_name, self.dst_item_name)
-                )
-            elif src_item_type == "Tool" and dst_item_type in ["Data Connection", "Data Store"]:
-                self._toolbox.msg.emit(
-                    "Link established. Tool <b>{0}</b> output files will be "
-                    "passed to item <b>{1}</b> after execution.".format(self.src_item_name, self.dst_item_name)
-                )
-            elif src_item_type in ["Data Connection", "Data Store", "Data Interface"] and dst_item_type in [
-                "Data Connection",
-                "Data Store",
-                "Data Interface",
-            ]:
-                self._toolbox.msg.emit("Link established")
-            elif src_item_type == "Tool" and dst_item_type == "View":
-                self._toolbox.msg_warning.emit(
-                    "Link established. You can visualize the ouput from Tool "
-                    "<b>{0}</b> in View <b>{1}</b>.".format(self.src_item_name, self.dst_item_name)
-                )
-            elif src_item_type == "Data Store" and dst_item_type == "View":
-                self._toolbox.msg_warning.emit(
-                    "Link established. You can visualize Data Store "
-                    "<b>{0}</b> in View <b>{1}</b>.".format(self.src_item_name, self.dst_item_name)
-                )
-            elif src_item_type == "Tool" and dst_item_type == "Tool":
-                self._toolbox.msg_warning.emit("Link established.")
-            else:
-                self._toolbox.msg_warning.emit(
-                    "Link established. Interaction between a "
-                    "<b>{0}</b> and a <b>{1}</b> has not been "
-                    "implemented yet.".format(src_item_type, dst_item_type)
-                )
+    def notify_destination_items(self):
+        """Notify destination items that they have been connected to a source item."""
+        src_leaf_item = self._project_item_model.get_item(self.src_item_name)
+        if src_leaf_item is None:
+            logging.error("Item %s not found", self.src_item_name)
+            return
+        dst_leaf_item = self._project_item_model.get_item(self.dst_item_name)
+        if dst_leaf_item is None:
+            logging.error("Item %s not found", self.dst_item_name)
+            return
+        src_item = src_leaf_item.project_item
+        dst_item = dst_leaf_item.project_item
+        dst_item.notify_destination(src_item)
+
+    @Slot("QVariant")
+    def connect_engine_signals(self, engine):
+        """Connects signals needed for icon animations from given engine."""
+        engine.dag_node_execution_started.connect(self._start_animation)
+        engine.dag_node_execution_finished.connect(self._stop_animation)
+
+    @Slot(str, "QVariant")
+    def _start_animation(self, item_name, direction):
+        """Starts item icon animation when executing forward."""
+        if direction == ExecutionDirection.BACKWARD:
+            return
+        item = self._project_item_model.get_item(item_name).project_item
+        icon = item.get_icon()
+        if hasattr(icon, "start_animation"):
+            icon.start_animation()
+
+    @Slot(str, "QVariant")
+    def _stop_animation(self, item_name, direction):
+        """Stops item icon animation when executing forward."""
+        if direction == ExecutionDirection.BACKWARD:
+            return
+        item = self._project_item_model.get_item(item_name).project_item
+        icon = item.get_icon()
+        if hasattr(icon, "stop_animation"):
+            icon.stop_animation()
 
 
 class GraphQGraphicsView(CustomQGraphicsView):
     """QGraphicsView for the Graph View."""
 
-    item_dropped = Signal("QPoint", "QString", name="item_dropped")
+    item_dropped = Signal("QPoint", "QString")
 
-    def __init__(self, parent):
-        """Init GraphQGraphicsView."""
-        super().__init__(parent=parent)
-        self._graph_view_form = None
+    context_menu_requested = Signal("QPoint")
 
     def dragLeaveEvent(self, event):
         """Accept event. Then call the super class method
@@ -543,9 +554,11 @@ class GraphQGraphicsView(CustomQGraphicsView):
         if not isinstance(source, DragListView):
             super().dropEvent(event)
             return
+        entity_type = source.model().entity_type
         event.acceptProposedAction()
-        text = event.mimeData().text()
+        entity_class_id = event.mimeData().text()
         pos = event.pos()
+        text = entity_type + ":" + entity_class_id
         self.item_dropped.emit(pos, text)
 
     def contextMenuEvent(self, e):
@@ -557,8 +570,39 @@ class GraphQGraphicsView(CustomQGraphicsView):
         super().contextMenuEvent(e)
         if e.isAccepted():
             return
-        if not self._graph_view_form:
-            e.ignore()
-            return
         e.accept()
-        self._graph_view_form.show_graph_view_context_menu(e.globalPos())
+        self.context_menu_requested.emit(e.globalPos())
+
+    def gentle_zoom(self, factor, zoom_focus):
+        """
+        Perform a zoom by a given factor.
+
+        Args:
+            factor (float): a scaling factor relative to the current scene scaling
+            zoom_focus (QPoint): focus of the zoom, e.g. mouse pointer position
+        """
+        if not super().gentle_zoom(factor, zoom_focus):
+            return False
+        self.adjust_items_to_zoom()
+        return True
+
+    def reset_zoom(self):
+        """Reset zoom to the default factor."""
+        self.resetTransform()
+        self.init_zoom()
+
+    def init_zoom(self):
+        """Init zoom."""
+        self.resetTransform()
+        self.scale(self._scene_fitting_zoom, self._scene_fitting_zoom)
+        self.adjust_items_to_zoom()
+
+    def adjust_items_to_zoom(self):
+        """
+        Update items geometry after performing a zoom.
+
+        Some items (e.g. ArcItem) need this to stay the same size after a zoom.
+        """
+        for item in self.items():
+            if hasattr(item, "adjust_to_zoom"):
+                item.adjust_to_zoom(self.transform())

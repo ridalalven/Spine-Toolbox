@@ -1,5 +1,5 @@
 ######################################################################################################################
-# Copyright (C) 2017-2019 Spine project consortium
+# Copyright (C) 2017-2020 Spine project consortium
 # This file is part of Spine Toolbox.
 # Spine Toolbox is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General
 # Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
@@ -20,7 +20,6 @@ from datetime import datetime
 from PySide2.QtCore import QDate, QDateTime, QTime, Slot
 from PySide2.QtWidgets import QWidget
 from spinedb_api import DateTime
-from ui.datetime_editor import Ui_DatetimeEditor
 
 
 def _QDateTime_to_datetime(dt):
@@ -53,6 +52,8 @@ class DatetimeEditor(QWidget):
     """
 
     def __init__(self, parent=None):
+        from ..ui.datetime_editor import Ui_DatetimeEditor
+
         super().__init__(parent)
         self._value = DateTime("2000-01-01")
         self._ui = Ui_DatetimeEditor()
