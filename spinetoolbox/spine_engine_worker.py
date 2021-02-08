@@ -30,6 +30,8 @@ def _handle_dag_execution_started(project_items):
 def _handle_node_execution_started(item, direction):
     icon = item.get_icon()
     if direction == "FORWARD":
+        msg = "log_" + item.name + "." + str(item.execution_id())
+        item.add_execution_header(msg)
         icon.execution_icon.mark_execution_started()
         if hasattr(icon, "animation_signaller"):
             icon.animation_signaller.animation_started.emit()
@@ -50,6 +52,10 @@ def _handle_node_execution_finished(item, direction, state, success, skipped):
 def _handle_event_message_arrived(item, filter_id, msg_type, msg_text):
     item.add_event_message(filter_id, msg_type, msg_text)
 
+@Slot(object, str, str)
+def _handle_main_event_message_arrived(item, filter_id, msg_type, msg_text):
+    item.add_main_event_message(filter_id, msg_type, msg_text)
+
 
 @Slot(object, str, str)
 def _handle_process_message_arrived(item, filter_id, msg_type, msg_text):
@@ -64,6 +70,7 @@ class SpineEngineWorker(QObject):
     _node_execution_finished = Signal(object, object, object, bool, bool)
     _event_message_arrived = Signal(object, str, str, str)
     _process_message_arrived = Signal(object, str, str, str)
+    _main_event_message_arrived = Signal(object, str, str, str)
 
     def __init__(self, toolbox, engine_data, dag, dag_identifier, project_items):
         """
@@ -86,13 +93,14 @@ class SpineEngineWorker(QObject):
         self._project_items = project_items
         self.sucessful_executions = []
         self._thread = QThread()
-        self.moveToThread(self._thread)
+        # self.moveToThread(self._thread)
         self._thread.started.connect(self.do_work)
         self._dag_execution_started.connect(_handle_dag_execution_started)
         self._node_execution_started.connect(_handle_node_execution_started)
         self._node_execution_finished.connect(_handle_node_execution_finished)
         self._event_message_arrived.connect(_handle_event_message_arrived)
         self._process_message_arrived.connect(_handle_process_message_arrived)
+        self._main_event_message_arrived.connect(_handle_main_event_message_arrived)
 
     def stop_engine(self):
         self._engine_mngr.stop_engine()
@@ -127,6 +135,7 @@ class SpineEngineWorker(QObject):
             "process_msg": self._handle_process_msg,
             "standard_execution_msg": self._handle_standard_execution_msg,
             "kernel_execution_msg": self._handle_kernel_execution_msg,
+            "main_event_msg": self._handle_main_event_msg,
         }.get(event_type)
         if handler is None:
             return
@@ -189,6 +198,13 @@ class SpineEngineWorker(QObject):
     def _do_handle_event_msg(self, item_name, filter_id, msg_type, msg_text):
         item = self._project_items[item_name]
         self._event_message_arrived.emit(item, filter_id, msg_type, msg_text)
+
+    def _handle_main_event_msg(self, data):
+        self._do_handle_main_event_msg(**data)
+
+    def _do_handle_main_event_msg(self, item_name, filter_id, msg_type, msg_text):
+        item = self._project_items[item_name]
+        self._main_event_message_arrived.emit(item, filter_id, msg_type, msg_text)
 
     def _handle_node_execution_started(self, data):
         self._do_handle_node_execution_started(**data)

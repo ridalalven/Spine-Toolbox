@@ -78,7 +78,7 @@ def format_process_message(msg_type, message):
 
 
 def add_message_to_document(document, message):
-    """Adds a message to a document and return the cursor.
+    """Adds a message to a document and returns the cursor.
 
     Args:
         document (QTextDocument)

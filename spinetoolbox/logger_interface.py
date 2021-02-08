@@ -45,3 +45,4 @@ class LoggerInterface(QObject):
     """Requests an 'information message box' (e.g. a message window) to be opened with a given title and message."""
     error_box = Signal(str, str)
     """Requests an 'error message box' to be opened with a given title and message."""
+    main_msg = Signal(str, str)

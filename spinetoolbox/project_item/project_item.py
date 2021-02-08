@@ -17,13 +17,38 @@ Contains base classes for project items and item factories.
 
 import os
 import logging
-from PySide2.QtCore import Signal, Slot
+from PySide2.QtCore import Signal, Slot, Qt, QFile, QSizeF, QIODevice, QObject
+from PySide2.QtGui import QTextCursor, QTextFrame, QTextFrameFormat, QTextCharFormat, QBrush, QTextObjectInterface, \
+    QTextFormat, QPainter, QImage
+from PySide2.QtWidgets import QMessageBox
+from PySide2.QtSvg import QSvgRenderer
 from spine_engine.utils.helpers import shorten
 from ..helpers import create_dir, open_url, QuietLogger
 from ..metaobject import MetaObject
 from ..project_commands import SetItemSpecificationCommand
 from ..widgets.custom_qtextbrowser import SignedTextDocument
 from ..helpers import format_event_message, format_process_message, add_message_to_document
+from ..logger_interface import LoggerInterface
+from ..config import SVGDATA, SVGTEXTFORMAT
+
+
+class _ProjectItemLogger(LoggerInterface):
+    """A project item specific logger."""
+
+    def __init__(self, item, box_logger):
+        """
+        Args:
+            item (ProjectItem)
+            box_logger (LoggerInterface)
+        """
+        super().__init__()
+        self.msg.connect(lambda text: item.add_event_message("", "msg", text))
+        self.msg_success.connect(lambda text: item.add_event_message("", "msg_success", text))
+        self.msg_error.connect(lambda text: item.add_event_message("", "msg_error", text))
+        self.msg_warning.connect(lambda text: item.add_event_message("", "msg_warning", text))
+        self.information_box.connect(box_logger.information_box)
+        self.error_box.connect(box_logger.error_box)
+        self.main_msg.connect(lambda text: item.add_main_message("msg", text))
 
 
 class ProjectItem(MetaObject):
@@ -65,12 +90,32 @@ class ProjectItem(MetaObject):
         self.data_dir = os.path.join(self._project.items_dir, self.short_name)
         self._specification = None
         self.undo_specification = None
-        self._event_document = SignedTextDocument(name)
+        # self._event_document = SignedTextDocument(name)
+        self._event_documents = dict()
         self._process_document = SignedTextDocument(name)
         self._filter_log_documents = {}
         self.julia_console = None
         self.python_console = None
         self._filter_consoles = {}
+        self._execution_id = 0
+        # self.setupTextObject()
+        # self._event_document.contentsChanged.connect(self.doc_contents_changed)
+        # self._event_document.blockCountChanged.connect(self.block_count_changed)
+
+    # @Slot(int)
+    # def block_count_changed(self, n):
+    #     logging.debug(f"[{self.name}] blocks:{n}")
+    #
+    # @Slot()
+    # def doc_contents_changed(self):
+    #     txt = self._event_document.toPlainText()
+    #     logging.debug(f"[{self.name}] new content:'{txt}'")
+
+    def execution_id(self):
+        return self._execution_id
+
+    def update_execution_id(self):
+        self._execution_id += 1
 
     def create_data_dir(self):
         try:
@@ -100,9 +145,9 @@ class ProjectItem(MetaObject):
     def logger(self):
         return self._logger
 
-    @property
-    def event_document(self):
-        return self._event_document
+    # @property
+    # def event_document(self):
+    #     return self._event_document
 
     @property
     def process_document(self):
@@ -115,6 +160,12 @@ class ProjectItem(MetaObject):
     @property
     def filter_consoles(self):
         return self._filter_consoles
+
+    def make_event_document(self, exec_id):
+        self._event_documents[exec_id] = SignedTextDocument(self.name)
+
+    def get_event_document(self, exec_id):
+        return self._event_documents[exec_id]
 
     # pylint: disable=no-self-use
     def make_signal_handler_dict(self):
@@ -184,8 +235,7 @@ class ProjectItem(MetaObject):
         return self._specification
 
     def set_specification(self, specification):
-        """Pushes a new SetToolSpecificationCommand to the toolbox' undo stack.
-        """
+        """Pushes a new SetToolSpecificationCommand to the toolbox' undo stack."""
         if specification == self._specification:
             return
         self._toolbox.undo_stack.push(SetItemSpecificationCommand(self, specification))
@@ -326,6 +376,7 @@ class ProjectItem(MetaObject):
             "description": self.description,
             "x": self.get_icon().sceneBoundingRect().center().x(),
             "y": self.get_icon().sceneBoundingRect().center().y(),
+            "execution_id": self._execution_id
         }
 
     @staticmethod
@@ -455,6 +506,45 @@ class ProjectItem(MetaObject):
             if self._active:
                 self._project._toolbox.ui.listView_executions.model().layoutChanged.emit()
 
+    def add_execution_header(self, exec_header_txt):
+        # TODO: Make this into a slot and call with a signal.
+        """Adds an execution header into Event Log. Header contains a clickable icon
+        for inserting or removing this item's execution log in Event Log.
+
+        Args:
+            exec_header_txt (str): Text containing the item name and execution Id prepended with 'log_'
+        """
+        document = self._project._toolbox.ui.textBrowser_eventlog.document()
+        name, exec_id = msg_text[4:].split(".")  # text starts with 'log_'
+        cursor = QTextCursor(document)
+        cursor.movePosition(QTextCursor.End)
+        frame_format = QTextFrameFormat()
+        frame_format.setBorder(1)
+        frame_format.setBorderStyle(QTextFrameFormat.BorderStyle_Solid)
+        frame_format.setBorderBrush(QBrush(Qt.blue))
+        # frame_format.setLeftMargin(10)
+        # frame_format.setPadding(5)
+        cursor.insertFrame(frame_format)
+        svg_images = self._project._toolbox.svg_storage()
+        self.insert_text_object(cursor, svg_images["heart"], msg_text)
+        cursor.insertHtml(name)
+
+    def insert_text_object(self, cursor, svg_data, href):
+        """Inserts given SVG image at cursor.
+
+        Args:
+            cursor (QTextCursor): Cursor
+            svg_data (QByteArray): Preloaded SVG image
+            href (str): Anchor href ('log_execution id')
+        """
+        svg_char_format = QTextCharFormat()
+        svg_char_format.setObjectType(SVGTEXTFORMAT)
+        svg_char_format.setProperty(SVGDATA, svg_data)
+        svg_char_format.setAnchor(True)
+        svg_char_format.setAnchorHref(href)
+        orc = chr(0xfffc)  # Object replacement character
+        cursor.insertText(orc, svg_char_format)
+
     def add_event_message(self, filter_id, msg_type, msg_text):
         """Adds a message to the event log document.
 
@@ -463,13 +553,16 @@ class ProjectItem(MetaObject):
             msg_type (str): message type
             msg_text (str): message text
         """
+        logging.debug(f"[{msg_type}] {msg_text} [{filter_id}]")
         if filter_id:
             self._create_filter_log_documents(filter_id)
             document = self._filter_log_documents[filter_id]["event_log"]
         else:
-            document = self._event_document
+            document = self.get_event_document(self._execution_id)
         message = format_event_message(msg_type, msg_text)
         add_message_to_document(document, message)
+        # main_document = self._project._toolbox.ui.textBrowser_eventlog.document()
+        # add_message_to_document(main_document, message)
 
     def add_process_message(self, filter_id, msg_type, msg_text):
         """Adds a message to the process log document.

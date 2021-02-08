@@ -16,8 +16,9 @@ Class for a custom QTextBrowser for showing the logs and tool output.
 :date:   6.2.2018
 """
 
-from PySide2.QtCore import Slot
-from PySide2.QtGui import QTextCursor, QTextDocument
+import logging
+from PySide2.QtCore import Slot, Qt
+from PySide2.QtGui import QTextCursor, QTextDocument, QTextFrame, QTextFrameFormat, QBrush
 from PySide2.QtWidgets import QTextBrowser, QAction
 from spinetoolbox.helpers import add_message_to_document
 from ..config import TEXTBROWSER_OVERRIDE_SS, TEXTBROWSER_SS
@@ -38,12 +39,69 @@ class CustomQTextBrowser(QTextBrowser):
             parent (QWidget): Parent widget
         """
         super().__init__(parent=parent)
+        self._toolbox = None
         self._original_document = SignedTextDocument()
         self.setDocument(self._original_document)
         self.setStyleSheet(TEXTBROWSER_SS)
         self._max_blocks = 2000
         self.setOpenExternalLinks(True)
         self.setOpenLinks(False)  # Don't try open file:/// links in the browser widget, we'll open them externally
+
+    def set_toolbox(self, tb):
+        self._toolbox = tb
+
+    def mousePressEvent(self, ev):
+        anchor = self.anchorAt(ev.pos())
+        print(anchor)
+        if not anchor.startswith("log_"):
+            return super().mousePressEvent(ev)
+        item_name, exec_id = anchor[4:].split(".")
+        item = self._toolbox.project_item_model.get_item(item_name).project_item  # Get project item
+        if not item:
+            self._toolbox.msg_error.emit(f"Showing {item_name} log failed")
+            return
+        c = self.cursorForPosition(ev.pos())
+        if not c.movePosition(QTextCursor.EndOfBlock):
+            logging.error(f"Cursor moving failed Could not show log. mouse clicked at:{ev.pos()}")
+            return
+        item_doc = item.get_event_document(int(exec_id))
+        # Compare the first line after anchor and the same first line of the item document, if they match, the document
+        # is already shown and we should remove the lines from the main document. If they do not match, append the doc
+        if item_doc.firstBlock().text() == "":
+            # Remove new line because the first block is a newline for some reason
+            logging.debug("Removing new line from item_doc")
+            cc = QTextCursor(item_doc)
+            cc.setPosition(0)
+            cc.deleteChar()
+        a = item_doc.firstBlock()
+        logging.debug(f"item_doc first block:'{a.text()}'")
+        b = c.block().next()  # This is the next block after the log title line
+        logging.debug(f"block at cursor:'{b.text()}'")
+        child_frames = self.document().rootFrame().childFrames()
+        # logging.debug(f"Child frames:{len(child_frames)}. item_doc lineCount:{item_doc.lineCount()}")
+        if a.text() == b.text():
+            # Remove item document from main document
+            logging.debug("Removing frame contents")
+            # c = QTextCursor(child_frames[0])
+            c.movePosition(QTextCursor.NextBlock)
+            self.setTextCursor(c)
+            # c = QTextCursor()
+            c.deleteChar()
+            c.select(QTextCursor.BlockUnderCursor)
+            logging.debug(f"Removing line:{c.selectedText()}")
+            c.removeSelectedText()
+        else:
+            self.setTextCursor(c)
+            # Insert a frame and add item document there
+            logging.debug(f"[{exec_id}] {item_name}. n:{item_doc.lineCount()}. doc:{item_doc.toPlainText()}")
+            frame_format = QTextFrameFormat()
+            frame_format.setBorder(1)
+            frame_format.setBorderStyle(QTextFrameFormat.BorderStyle_Solid)
+            frame_format.setBorderBrush(QBrush(Qt.white))
+            frame_format.setLeftMargin(15)
+            frame = c.insertFrame(frame_format)
+            self.insertHtml(item_doc.toHtml())
+            # self.insertHtml("<br/>")
 
     def set_override_document(self, document):
         """

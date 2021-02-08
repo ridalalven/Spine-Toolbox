@@ -22,8 +22,10 @@ import logging
 import json
 import pathlib
 import numpy as np
-from PySide2.QtCore import QByteArray, QItemSelection, QMimeData, QModelIndex, QPoint, Qt, Signal, Slot, QSettings, QUrl
-from PySide2.QtGui import QDesktopServices, QGuiApplication, QKeySequence, QIcon, QCursor
+from PySide2.QtCore import QByteArray, QItemSelection, QMimeData, QModelIndex, QPoint, Qt, Signal, Slot, QSettings, \
+    QUrl, QFile, QIODevice, QObject, QSizeF
+from PySide2.QtGui import QDesktopServices, QGuiApplication, QKeySequence, QIcon, QCursor, QTextDocument, QTextCursor, \
+    QTextFormat, QTextCharFormat
 from PySide2.QtWidgets import (
     QMainWindow,
     QApplication,
@@ -37,11 +39,13 @@ from PySide2.QtWidgets import (
     QAction,
     QUndoStack,
 )
+from PySide2.QtSvg import QSvgRenderer
 from spine_engine.utils.serialization import serialize_path, deserialize_path
 from spine_engine.utils.helpers import shorten
 from .graphics_items import ProjectItemIcon
 from .category import CATEGORIES, CATEGORY_DESCRIPTIONS
 from .load_project_items import load_item_specification_factories, load_project_items
+from .text_object_interface import SvgTextObject
 from .mvcmodels.project_item_model import ProjectItemModel
 from .mvcmodels.project_item_factory_models import ProjectItemSpecFactoryModel, FilteredSpecFactoryModel
 from .mvcmodels.filter_execution_model import FilterExecutionModel
@@ -65,6 +69,8 @@ from .config import (
     LATEST_PROJECT_VERSION,
     DEFAULT_WORK_DIR,
     PROJECT_FILENAME,
+    SVGDATA,
+    SVGTEXTFORMAT,
 )
 from .helpers import (
     create_dir,
@@ -101,6 +107,7 @@ class ToolboxUI(QMainWindow):
     msg_proc_error = Signal(str)
     information_box = Signal(str, str)
     error_box = Signal(str, str)
+    main_msg = Signal(str, str)
     # The rest of the msg_* signals should be moved to LoggerInterface in the long run.
 
     def __init__(self):
@@ -144,6 +151,7 @@ class ToolboxUI(QMainWindow):
         self.link_properties_widget = LinkPropertiesWidget(self)
         self._saved_specification = None
         self._anchor_callbacks = {}
+        self._svg_storage = dict()
         # DB manager
         self.db_mngr = SpineDBManager(self._qsettings, self)
         # Widget and form references
@@ -174,6 +182,9 @@ class ToolboxUI(QMainWindow):
         self.set_debug_qactions()
         self.ui.tabWidget_item_properties.tabBar().hide()  # Hide tab bar in properties dock widget
         # Finalize init
+        self.ui.textBrowser_eventlog.set_toolbox(self)
+        self.setup_text_object_handler()
+        self.make_svg_storage()
         self._proposed_item_name_counts = dict()
         self.ui.actionSave.setDisabled(True)
         self.ui.actionSave_As.setDisabled(True)
@@ -186,6 +197,18 @@ class ToolboxUI(QMainWindow):
         self.main_toolbar.setup()
         self.set_work_directory()
         self.connect_signals()
+
+    def setup_text_object_handler(self):
+        svg_interface = SvgTextObject(self)
+        self.ui.textBrowser_eventlog.document().documentLayout().registerHandler(SVGTEXTFORMAT, svg_interface)
+        # self.ui.textBrowser_eventlog._original_document.documentLayout().registerHandler(ToolboxUI.SvgTextFormat, svgInterface)
+
+        # doc_layout = self.ui.textBrowser_eventlog._original_document.documentLayout()
+        # doc_layout.registerHandler(ToolboxUI.SvgTextFormat, svgInterface)
+        # self.ui.textBrowser_eventlog.document().setDocumentLayout(doc_layout)
+        # self.ui.textBrowser_eventlog._original_document.setDocumentLayout(doc_layout)
+        # handler = self.ui.textBrowser_eventlog.document().documentLayout().handlerForObject(ToolboxUI.SvgTextFormat)
+        # print(handler)
 
     def connect_signals(self):
         """Connect signals."""
@@ -200,6 +223,7 @@ class ToolboxUI(QMainWindow):
         # Message box signals
         self.information_box.connect(self._show_message_box)
         self.error_box.connect(self._show_error_box)
+        # self.main_msg.connect(self._show_msg_from_engine)
         # Menu commands
         self.ui.actionNew.triggered.connect(self.new_project)
         self.ui.actionOpen.triggered.connect(self.open_project)
@@ -1116,6 +1140,83 @@ class ToolboxUI(QMainWindow):
         if callback is not None:
             callback()
             return
+        if url.startswith("log_"):
+            # This is handled by mousePressEvent in CustomQTextBrowser
+            return
+
+            # item_name_and_id= url[4:]
+            # item_name, exec_id = item_name_and_id.split(".")
+            # logging.debug(f"anchorClicked(): Showing {item_name} log. Execution id:{exec_id}")
+            # Find project item
+            # item = self.project_item_model.get_item(item_name).project_item
+            # if not item:
+            #     self._logger.msg_error.emit(f"Showing {item_name} log failed")
+            #     return
+            # # found = self.ui.textBrowser_eventlog.find("Order: Tester", flag)
+            # # print(f"{url} found:{found}")
+            # main_doc = self.ui.textBrowser_eventlog.document()
+            # cursor = self.ui.textBrowser_eventlog.textCursor()
+            # logging.debug(f"Cursor position:{cursor.position()}")
+            # cursor.setPosition(0)  # Cursor is at the start of main document
+            # new_cursor = main_doc.find("Show log", cursor)
+            # new_cursor.clearSelection()  # find() selects the found text
+            #
+            # moved = new_cursor.movePosition(QTextCursor.Down)
+            # moved = new_cursor.movePosition(QTextCursor.StartOfLine)
+            # self.ui.textBrowser_eventlog.setTextCursor(new_cursor)
+            # item_doc = item.get_event_document(int(exec_id))
+            # logging.debug(f"[{exec_id}] {item_name} doc:{item_doc.toPlainText()}")
+            # self.ui.textBrowser_eventlog.insertHtml(item_doc.toHtml())
+            # self.ui.textBrowser_eventlog.insertHtml("\n")
+
+            # Find blocks within this execution_id
+            # item_start_cursor = QTextCursor(item.event_document.findBlockByLineNumber(0))
+            # item_cursor = item.event_document.find("&" + exec_id, item_start_cursor)
+            # moved = item_cursor.movePosition(QTextCursor.Down)
+            # moved = item_cursor.movePosition(QTextCursor.StartOfLine)
+            # print(f"first block:{item.event_document.firstBlock()}")
+
+            # start_block = 0
+            # end_block = 0
+            # n_blocks = item.event_document.blockCount()
+            # for i in range(n_blocks):
+            #     block = item.event_document.findBlockByNumber(i)
+            #     print(block.text())
+            #     if "&" + exec_id in block.text():
+            #         start_block = i
+            #     elif "*" + exec_id in block.text():
+            #         end_block = i
+            # print(f"start:{start_block}. end:{end_block}")
+            # for y in range(end_block):
+            #     b = item.event_document.findBlockByNumber(y)
+            #     self.ui.textBrowser_eventlog.insertHtml(b.text())
+
+            # it = item.event_document.firstBlock().begin()
+            # while not it.atEnd():
+            #     fragment = it.fragment()
+            #     if fragment.isValid():
+            #         print(fragment.text())
+            #     it += 1
+
+            # self.ui.textBrowser_eventlog.insertHtml(item.event_document.toHtml())
+            # self.ui.textBrowser_eventlog.insertHtml("\n")
+
+            # print(f"new_cursor position:{new_cursor.position()}")
+            # # Remove first line (Show log) in item document
+            # cursor = QTextCursor(item.event_document.findBlockByLineNumber(0))
+            # cursor.select(QTextCursor.BlockUnderCursor)
+            # print(f"selectedText:{cursor.selectedText()}")
+            # cursor.removeSelectedText()
+            # cursor = QTextCursor(item.event_document.findBlockByLineNumber(1))
+            # cursor.select(QTextCursor.BlockUnderCursor)
+            # print(f"selectedText:{cursor.selectedText()}")
+            # cursor.removeSelectedText()
+
+            # first_block = item.event_document.firstBlock()
+            # print(f"first block:{first_block.text()}")
+            # next_block = first_block.next()
+            # print(f"second block:{next_block.text()}")
+
         # noinspection PyTypeChecker, PyCallByClass, PyArgumentList
         res = QDesktopServices.openUrl(qurl)
         if not res:
@@ -1268,6 +1369,18 @@ class ToolboxUI(QMainWindow):
         d = int(self._qsettings.value("appSettings/dateTime", defaultValue="2"))
         return d != 0
 
+    # @Slot(str, str)
+    # def _show_msg_from_engine(self, msg_type, msg_text):
+    #     """Adds a message to the main event log document.
+    #
+    #     Args:
+    #         msg_type (str): message type
+    #         msg_text (str): message text
+    #     """
+    #     document = self.ui.textBrowser_eventlog.document()
+    #     message = format_event_message(msg_type, msg_text)
+    #     add_message_to_document(document, message)
+
     @Slot(str)
     def add_message(self, msg):
         """Append regular message to Event Log.
@@ -1356,6 +1469,7 @@ class ToolboxUI(QMainWindow):
 
     def override_event_log(self):
         """Sets the log document of the active project item in Event Log and updates title."""
+        # TODO: Comment this for testing
         if self.executed_item is None:
             return
         document = self.executed_item.event_document
@@ -1400,8 +1514,9 @@ class ToolboxUI(QMainWindow):
 
     def restore_original_event_log_document(self):
         """Sets the Event Log document back to the original."""
-        self.ui.textBrowser_eventlog.restore_original_document()
-        self._update_event_log_title()
+        # logging.debug("Restoring original event log")
+        # self.ui.textBrowser_eventlog.restore_original_document()
+        # self._update_event_log_title()
 
     def restore_original_process_log_document(self):
         """Sets the Process Log document back to the original."""
@@ -2086,3 +2201,26 @@ class ToolboxUI(QMainWindow):
         engine_mngr = make_engine_manager(engine_server_address)
         for connection_file in self._extra_consoles:
             engine_mngr.shutdown_kernel(connection_file)
+
+    def make_svg_storage(self):
+        """Loads some SVG images into memory."""
+        # Load heart
+        heart = os.path.join("C:\\", "data", "heart.svg")
+        file = QFile(heart)
+        if not file.open(QIODevice.ReadOnly):
+            print("Could not open file heart.svg")
+            return
+        heart_data = file.readAll()  # svg_data is now as QByteArray
+        self._svg_storage["heart"] = heart_data
+        # Load apple
+        apple = os.path.join("C:\\", "data", "apple-alt.svg")
+        file = QFile(apple)
+        if not file.open(QIODevice.ReadOnly):
+            print("Could not open file apple-alt.svg")
+            return
+        apple_data = file.readAll()
+        self._svg_storage["apple"] = apple_data
+
+    def svg_storage(self):
+        """Returns a dictionary of pre-loaded SVG images."""
+        return self._svg_storage

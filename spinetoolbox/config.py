@@ -18,7 +18,7 @@ Application constants and style sheets
 
 import sys
 import os
-
+from PySide2.QtGui import QTextFormat
 
 REQUIRED_SPINE_ENGINE_VERSION = "0.9.14"
 REQUIRED_SPINEDB_API_VERSION = "0.10.8"
@@ -50,6 +50,10 @@ JUPYTER_KERNEL_TIME_TO_DEAD = 8.0
 
 # Project constants
 PROJECT_FILENAME = "project.json"
+
+# Constants for SVG images as text objects
+SVGTEXTFORMAT = QTextFormat.UserObject + 1
+SVGDATA = 1
 
 # Stylesheets
 STATUSBAR_SS = "QStatusBar{background-color: #EBEBE0; border-width: 1px; border-color: gray; border-style: groove;}"

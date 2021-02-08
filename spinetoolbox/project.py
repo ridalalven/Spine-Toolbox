@@ -440,6 +440,8 @@ class SpineToolboxProject(MetaObject):
         items = {}
         specifications = {}
         for name, project_item in project_items.items():
+            project_item.update_execution_id()
+            project_item.make_event_document(project_item.execution_id())
             items[name] = project_item.item_dict()
             spec = project_item.specification()
             if spec is not None:
