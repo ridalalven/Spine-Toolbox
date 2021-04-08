@@ -12,6 +12,8 @@
 
 .. note::
    This section is a little bit outdated.
+   
+.. _Setting up External Tools:
 
 *************************
 Setting up External Tools
